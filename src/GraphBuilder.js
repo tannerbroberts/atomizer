@@ -247,6 +247,12 @@ class GraphBuilder {
         if (spec.local === jsxName || spec.imported === jsxName) {
           // Return the resolved path if it's a local component
           if (imp.resolvedPath && this.fileMap.has(imp.resolvedPath)) {
+            // Check if this resolves to a barrel file - if so, follow the re-export
+            const resolvedFile = this.fileMap.get(imp.resolvedPath);
+            if (resolvedFile?.classification === 'barrel') {
+              const actualPath = this.followBarrelReexport(resolvedFile, jsxName);
+              if (actualPath) return actualPath;
+            }
             return imp.resolvedPath;
           }
         }
@@ -255,6 +261,11 @@ class GraphBuilder {
       // Handle default imports
       if (imp.specifiers.some(s => s.type === 'ImportDefaultSpecifier' && s.local === jsxName)) {
         if (imp.resolvedPath && this.fileMap.has(imp.resolvedPath)) {
+          const resolvedFile = this.fileMap.get(imp.resolvedPath);
+          if (resolvedFile?.classification === 'barrel') {
+            const actualPath = this.followBarrelReexport(resolvedFile, jsxName);
+            if (actualPath) return actualPath;
+          }
           return imp.resolvedPath;
         }
       }
@@ -262,6 +273,46 @@ class GraphBuilder {
 
     // Fallback to name-based matching
     return importNameToFile.get(jsxName) || null;
+  }
+
+  /**
+   * Follow barrel re-exports to find the actual file that exports the given name.
+   */
+  followBarrelReexport(barrelFile, exportName, visited = new Set()) {
+    if (visited.has(barrelFile.filePath)) return null;
+    visited.add(barrelFile.filePath);
+
+    for (const imp of barrelFile.imports) {
+      // Check if this import re-exports the name we're looking for
+      const hasName = imp.specifiers.some(s => 
+        s.local === exportName || s.imported === exportName
+      );
+      
+      // Also check for `export * from` which may include our name
+      const isWildcard = imp.isReexport && imp.specifiers.length === 0;
+      
+      if (hasName || isWildcard) {
+        if (imp.resolvedPath && this.fileMap.has(imp.resolvedPath)) {
+          const targetFile = this.fileMap.get(imp.resolvedPath);
+          
+          // If target is a component, we found it
+          if (targetFile.classification === 'component') {
+            return imp.resolvedPath;
+          }
+          
+          // If target is another barrel, recurse
+          if (targetFile.classification === 'barrel') {
+            const result = this.followBarrelReexport(targetFile, exportName, visited);
+            if (result) return result;
+          }
+          
+          // Otherwise return the resolved path
+          return imp.resolvedPath;
+        }
+      }
+    }
+
+    return null;
   }
 
   buildDependencyGraph() {

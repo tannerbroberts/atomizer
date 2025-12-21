@@ -1,5 +1,17 @@
 const path = require('path');
 
+/**
+ * STRICT HIERARCHY RULES:
+ * 
+ * Inside src/, ONLY these patterns are allowed:
+ *   1. Folders named after components/hooks (PascalCase for components, camelCase for hooks)
+ *   2. Each folder has an index file that defines the main export
+ *   3. Children (components, hooks, or support files) are nested inside their parent folder
+ *   4. NO loose files at any level - everything is a folder with an index
+ *   5. NO special directories like lib/, utils/, hooks/, types/, constants/
+ *   6. Shared code goes to the Lowest Common Ancestor folder
+ *   7. Assets are the ONLY exception - they can be loose files inside a component folder
+ */
 class StructureComputer {
   constructor(files, renderTree, dependencyGraph, srcPath) {
     this.files = files;
@@ -20,20 +32,20 @@ class StructureComputer {
     // Build the new directory structure based on render tree
     const newPaths = new Map();
     
-    // Step 1: Identify root components (entry points)
+    // Step 1: Identify root components AND hooks (both are first-class citizens)
     const roots = this.identifyRoots();
     
-    // Step 2: Process components according to rules
-    const componentPaths = this.computeComponentPaths(roots);
+    // Step 2: Process components and hooks according to strict rules
+    const atomicPaths = this.computeAtomicPaths(roots);
     
-    // Step 3: Process non-components based on dependency graph
-    const nonComponentPaths = this.computeNonComponentPaths(componentPaths);
+    // Step 3: Process support files (utils, types, etc.) - they MUST nest under their consumer
+    const supportPaths = this.computeSupportFilePaths(atomicPaths);
     
     // Merge all paths
-    for (const [filePath, newPath] of componentPaths) {
+    for (const [filePath, newPath] of atomicPaths) {
       newPaths.set(filePath, newPath);
     }
-    for (const [filePath, newPath] of nonComponentPaths) {
+    for (const [filePath, newPath] of supportPaths) {
       newPaths.set(filePath, newPath);
     }
     
@@ -80,19 +92,14 @@ class StructureComputer {
       destToSources.get(newPath).push(oldPath);
     }
     
-    // Resolve collisions
+    // Resolve collisions by making names unique
     for (const [dest, sources] of destToSources) {
       if (sources.length <= 1) continue;
       
-      // Multiple files are trying to move to the same location
-      // Resolution: keep them in their original relative structure from a common ancestor
       for (const source of sources) {
-        // Get the original relative path from srcPath
         const originalRelative = path.relative(this.srcPath, source);
         const parts = originalRelative.split(path.sep);
         
-        // If the file is in a subdirectory, include the parent dir in the name
-        // e.g., mutations/cart.ts → mutations-cart.ts, queries/cart.ts → queries-cart.ts
         if (parts.length >= 2) {
           const parentDir = parts[parts.length - 2];
           const fileName = parts[parts.length - 1];
@@ -100,31 +107,39 @@ class StructureComputer {
           const ext = file?.extension || path.extname(fileName);
           const baseName = path.basename(fileName, ext);
           
-          // Create a unique name: parent-basename
-          const uniqueName = `${parentDir}-${baseName}`;
-          const destDir = path.dirname(dest);
-          const newDest = path.join(destDir, uniqueName + ext);
+          // Create unique folder name: ParentBasename
+          const uniqueName = this.toPascalCase(parentDir) + this.toPascalCase(baseName);
+          const destDir = path.dirname(path.dirname(dest)); // Go up one level from index file
+          const newDest = path.join(destDir, uniqueName, 'index' + ext);
           
           newPaths.set(source, newDest);
         } else {
-          // File at root - keep it in place to avoid collision
           newPaths.set(source, source);
         }
       }
     }
   }
 
+  toPascalCase(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
+  toCamelCase(str) {
+    return str.charAt(0).toLowerCase() + str.slice(1);
+  }
+
+  /**
+   * Identify root-level atoms: ONLY components that have no parents in render tree.
+   * Hooks are NOT roots - they nest inside the component that uses them.
+   */
   identifyRoots() {
     const roots = [];
-    const components = this.files.filter(f => f.classification === 'component');
     
+    // Root components: no parent in render tree OR are entry points
+    const components = this.files.filter(f => f.classification === 'component');
     for (const comp of components) {
       const parents = this.renderTree.getParents(comp.filePath);
-      
-      // Check if it's an entry point
       const isEntryPoint = this.isEntryPoint(comp);
-      
-      // No parents in render tree = root component
       if (parents.length === 0 || isEntryPoint) {
         roots.push(comp.filePath);
       }
@@ -157,16 +172,20 @@ class StructureComputer {
     return entryPatterns.some(pattern => name.includes(pattern));
   }
 
-  computeComponentPaths(roots) {
+  /**
+   * STRICT RULE: Only components are first-class atoms.
+   * Process the render tree to place components in their hierarchy.
+   */
+  computeAtomicPaths(roots) {
     const paths = new Map();
     const processed = new Set();
     
-    // Process each root and its descendants
+    // Process each root component and its descendants
     for (const root of roots) {
       this.processComponentTree(root, this.srcPath, paths, processed);
     }
 
-    // Process any remaining components that weren't reached
+    // Process any remaining components that weren't reached (orphans)
     const components = this.files.filter(f => f.classification === 'component');
     for (const comp of components) {
       if (!processed.has(comp.filePath)) {
@@ -177,44 +196,73 @@ class StructureComputer {
     return paths;
   }
 
+  /**
+   * Process a component and its child components recursively.
+   * Each component becomes: parentDir/ComponentName/index.ext
+   */
   processComponentTree(nodeId, parentDir, paths, processed) {
     if (processed.has(nodeId)) return;
     processed.add(nodeId);
 
     const file = this.fileMap.get(nodeId);
-    if (!file) return;
+    if (!file || file.classification !== 'component') return;
 
-    // Rule 1: Component Atomicity - every component becomes a directory
+    // Skip entry points like main.tsx - they stay as-is
+    if (this.isSpecialEntryPoint(file)) {
+      paths.set(nodeId, file.filePath);
+      return;
+    }
+
+    // Component becomes: parentDir/ComponentName/index.ext
     const componentName = this.getComponentName(file);
     const newDir = path.join(parentDir, componentName);
     const newPath = path.join(newDir, 'index' + (file.extension || '.tsx'));
     
     paths.set(nodeId, newPath);
 
-    // Get children in render tree
+    // Process children from render tree
     const children = this.renderTree.getChildren(nodeId);
-
     for (const childId of children) {
       const childFile = this.fileMap.get(childId);
-      if (!childFile) continue;
+      if (!childFile || childFile.classification !== 'component') continue;
 
-      // Check if child is rendered only by this component (Rule 2)
-      // or by multiple components (Rule 3)
       const childParents = this.renderTree.getParents(childId);
       
       if (childParents.length === 1) {
-        // Rule 2: Private child - nest inside parent's directory
+        // Private child - nest inside this component's directory
         this.processComponentTree(childId, newDir, paths, processed);
       } else {
-        // Rule 3: Shared component - will be handled by LCA computation
-        // For now, mark it for later processing
+        // Shared component - place at LCA of all parents
         if (!processed.has(childId)) {
           const lca = this.findLCA(childParents, paths);
-          const sharedDir = path.join(lca, '_components');
-          this.processComponentTree(childId, sharedDir, paths, processed);
+          this.processComponentTree(childId, lca, paths, processed);
         }
       }
     }
+  }
+
+  /**
+   * Check if this is a special entry point that shouldn't be reorganized.
+   */
+  isSpecialEntryPoint(file) {
+    const name = file.name.toLowerCase();
+    return name === 'main' || name === 'index';
+  }
+
+  /**
+   * Get PascalCase component name for directory.
+   */
+  getComponentName(file) {
+    let name = file.name;
+    
+    // Handle index files - use parent directory name
+    if (name === 'index') {
+      const dir = path.dirname(file.filePath);
+      name = path.basename(dir);
+    }
+
+    // Ensure PascalCase
+    return this.toPascalCase(name);
   }
 
   findLCA(nodeIds, existingPaths) {
@@ -252,91 +300,128 @@ class StructureComputer {
     return path.join(this.srcPath, ...commonParts);
   }
 
-  computeNonComponentPaths(componentPaths) {
+  /**
+   * STRICT RULE: All support files (hooks, utils, types, constants, etc.) MUST be nested
+   * inside the folder of the component that imports them.
+   * 
+   * HOOKS are treated as support files - they nest inside their consuming component.
+   * If multiple components import the same file, it goes to their LCA folder.
+   * Support files also become folders with index files (no loose files).
+   * 
+   * This uses an iterative approach to handle dependencies between support files.
+   */
+  computeSupportFilePaths(atomicPaths) {
     const paths = new Map();
-    const nonComponents = this.files.filter(f => 
+    
+    // Support file classifications - everything that's not a component or special
+    const supportFiles = this.files.filter(f => 
       f.classification !== 'component' && 
-      f.classification !== 'asset' &&
-      f.classification !== 'test' &&
       f.classification !== 'barrel' &&
       f.classification !== 'test-setup' &&
       f.classification !== 'root-config'
     );
 
-    for (const file of nonComponents) {
-      // Find who imports this file
-      const importers = this.dependencyGraph.getParents(file.filePath);
+    // Build a combined lookup that includes both atomic paths and support paths
+    const allPaths = new Map(atomicPaths);
+    
+    // Process in multiple passes until all files are placed
+    let remaining = [...supportFiles];
+    let maxIterations = 10; // Prevent infinite loops
+    
+    while (remaining.length > 0 && maxIterations > 0) {
+      maxIterations--;
+      const stillRemaining = [];
       
-      if (importers.length === 0) {
-        // Orphaned file - keep in root
-        paths.set(file.filePath, file.filePath);
-        continue;
-      }
+      for (const file of remaining) {
+        // Skip special entry points entirely - they stay as-is
+        if (this.isSpecialEntryPoint(file)) {
+          paths.set(file.filePath, file.filePath);
+          allPaths.set(file.filePath, file.filePath);
+          continue;
+        }
 
-      if (importers.length === 1) {
-        // Rule 4: Private - collocate with the single importer
-        const importerPath = componentPaths.get(importers[0]) || importers[0];
-        const importerDir = path.dirname(importerPath);
-        const subDir = this.getSubdirectory(file.classification);
-        const newPath = path.join(importerDir, subDir, file.name + file.extension);
+        const importers = this.dependencyGraph.getParents(file.filePath);
+        
+        // Check if all importers are resolved
+        const allImportersResolved = importers.every(imp => allPaths.has(imp));
+        
+        if (importers.length > 0 && !allImportersResolved) {
+          // Wait for importers to be resolved first
+          stillRemaining.push(file);
+          continue;
+        }
+        
+        // Find the target directory based on importers
+        let targetDir;
+        
+        if (importers.length === 0) {
+          // Orphaned file - stays at src root but still becomes a folder
+          targetDir = this.srcPath;
+        } else if (importers.length === 1) {
+          // Single importer - nest inside that importer's folder
+          const importerPath = allPaths.get(importers[0]) || importers[0];
+          targetDir = path.dirname(importerPath);
+        } else {
+          // Multiple importers - find LCA using resolved paths
+          targetDir = this.findLCAWithPaths(importers, allPaths);
+        }
+
+        // Compute the new path based on file type
+        let newPath;
+        
+        if (file.classification === 'asset') {
+          // Assets are the ONE exception - they can be loose files
+          newPath = path.join(targetDir, file.name + file.extension);
+        } else if (file.classification === 'test') {
+          // Tests sit next to their source
+          const sourceFile = this.findTestSourceFile(file);
+          if (sourceFile) {
+            const sourcePath = allPaths.get(sourceFile.filePath) || sourceFile.filePath;
+            const sourceDir = path.dirname(sourcePath);
+            newPath = path.join(sourceDir, file.name + file.extension);
+          } else {
+            // No matching source - keep at src root as loose file
+            newPath = file.filePath;
+          }
+        } else if (file.classification === 'hook') {
+          // Hooks become folders with index files
+          const folderName = this.getHookFolderName(file);
+          newPath = path.join(targetDir, folderName, 'index' + file.extension);
+        } else {
+          // All other support files become folders with index files
+          const folderName = this.getSupportFolderName(file);
+          newPath = path.join(targetDir, folderName, 'index' + file.extension);
+        }
+        
         paths.set(file.filePath, newPath);
-      } else {
-        // Rule 4: Shared - move to LCA
-        const lca = this.findLCA(importers, componentPaths);
-        const subDir = this.getSubdirectory(file.classification);
-        const newPath = path.join(lca, subDir, file.name + file.extension);
-        paths.set(file.filePath, newPath);
+        allPaths.set(file.filePath, newPath);
       }
-    }
-
-    // Handle test files - they follow their source file
-    const testFiles = this.files.filter(f => f.classification === 'test');
-    for (const testFile of testFiles) {
-      const sourceFile = this.findTestSourceFile(testFile);
-      if (sourceFile) {
-        const sourcePath = componentPaths.get(sourceFile.filePath) || 
-                           paths.get(sourceFile.filePath) || 
-                           sourceFile.filePath;
-        const sourceDir = path.dirname(sourcePath);
-        const newPath = path.join(sourceDir, testFile.name + testFile.extension);
-        paths.set(testFile.filePath, newPath);
-      } else {
-        // No matching source - keep in place
-        paths.set(testFile.filePath, testFile.filePath);
+      
+      // If we made no progress, break to avoid infinite loop
+      if (stillRemaining.length === remaining.length) {
+        // Place remaining files at src root as fallback
+        for (const file of stillRemaining) {
+          if (this.isSpecialEntryPoint(file)) {
+            paths.set(file.filePath, file.filePath);
+          } else if (file.classification === 'asset') {
+            paths.set(file.filePath, path.join(this.srcPath, file.name + file.extension));
+          } else {
+            const folderName = file.classification === 'hook' 
+              ? this.getHookFolderName(file) 
+              : this.getSupportFolderName(file);
+            paths.set(file.filePath, path.join(this.srcPath, folderName, 'index' + file.extension));
+          }
+        }
+        break;
       }
+      
+      remaining = stillRemaining;
     }
 
-    // Handle test-setup files - keep in src root
-    const testSetupFiles = this.files.filter(f => f.classification === 'test-setup');
-    for (const setupFile of testSetupFiles) {
-      paths.set(setupFile.filePath, setupFile.filePath);
-    }
-
-    // Handle barrel files - we'll regenerate them, so mark for removal
-    // The barrel file content will be regenerated by the Migrator
+    // Handle barrel files - mark for removal (they'll be regenerated)
     const barrelFiles = this.files.filter(f => f.classification === 'barrel');
     for (const barrel of barrelFiles) {
-      // Keep barrel files in place but mark for regeneration
       paths.set(barrel.filePath, barrel.filePath);
-    }
-
-    // Handle assets
-    const assets = this.files.filter(f => f.classification === 'asset');
-    for (const asset of assets) {
-      const importers = this.dependencyGraph.getParents(asset.filePath);
-      
-      if (importers.length <= 1) {
-        const importerPath = importers[0] ? 
-          (componentPaths.get(importers[0]) || importers[0]) : 
-          this.srcPath;
-        const importerDir = importers[0] ? path.dirname(importerPath) : this.srcPath;
-        const newPath = path.join(importerDir, 'assets', asset.name + asset.extension);
-        paths.set(asset.filePath, newPath);
-      } else {
-        const lca = this.findLCA(importers, componentPaths);
-        const newPath = path.join(lca, 'assets', asset.name + asset.extension);
-        paths.set(asset.filePath, newPath);
-      }
     }
 
     // Handle root-config files - never move them
@@ -346,6 +431,79 @@ class StructureComputer {
     }
 
     return paths;
+  }
+
+  /**
+   * Find LCA using already-resolved paths.
+   */
+  findLCAWithPaths(nodeIds, resolvedPaths) {
+    if (nodeIds.length === 0) return this.srcPath;
+    if (nodeIds.length === 1) {
+      const existingPath = resolvedPaths.get(nodeIds[0]);
+      return existingPath ? path.dirname(existingPath) : this.srcPath;
+    }
+
+    // Get resolved paths for all nodes
+    const nodePaths = nodeIds.map(id => {
+      const resolved = resolvedPaths.get(id);
+      if (resolved) {
+        return path.dirname(resolved);
+      }
+      return path.dirname(id);
+    });
+
+    // Find common ancestor
+    const parts = nodePaths.map(p => path.relative(this.srcPath, p).split(path.sep));
+    
+    const commonParts = [];
+    const minLength = Math.min(...parts.map(p => p.length));
+    
+    for (let i = 0; i < minLength; i++) {
+      const current = parts[0][i];
+      if (parts.every(p => p[i] === current)) {
+        commonParts.push(current);
+      } else {
+        break;
+      }
+    }
+
+    return path.join(this.srcPath, ...commonParts);
+  }
+
+  /**
+   * Get folder name for hooks - preserves useXxx naming.
+   */
+  getHookFolderName(file) {
+    let name = file.name;
+    
+    if (name === 'index') {
+      const dir = path.dirname(file.filePath);
+      name = path.basename(dir);
+    }
+    
+    // Ensure it starts with 'use'
+    return name.startsWith('use') ? name : 'use' + this.toPascalCase(name);
+  }
+
+  /**
+   * Get folder name for support files.
+   * Preserves the original casing intent while ensuring valid folder names.
+   */
+  getSupportFolderName(file) {
+    let name = file.name;
+    
+    // Handle index files
+    if (name === 'index') {
+      const dir = path.dirname(file.filePath);
+      name = path.basename(dir);
+    }
+    
+    // Types get a lowercase 'types' prefix if not already there
+    if (file.classification === 'type' && !name.toLowerCase().includes('type')) {
+      return name + 'Types';
+    }
+    
+    return name;
   }
 
   findTestSourceFile(testFile) {
@@ -383,34 +541,6 @@ class StructureComputer {
     }
     
     return null;
-  }
-
-  getSubdirectory(classification) {
-    const dirs = {
-      'hook': 'hooks',
-      'util': 'utils',
-      'constant': 'constants',
-      'type': 'types',
-      'context': 'contexts',
-      'style': 'styles',
-      'barrel': '',
-      'module': 'lib',
-    };
-    return dirs[classification] || 'lib';
-  }
-
-  getComponentName(file) {
-    // Use PascalCase for component directories
-    let name = file.name;
-    
-    // Handle index files - use parent directory name
-    if (name === 'index') {
-      const dir = path.dirname(file.filePath);
-      name = path.basename(dir);
-    }
-
-    // Ensure PascalCase
-    return name.charAt(0).toUpperCase() + name.slice(1);
   }
 
   computeImportUpdates(file, newPaths) {
