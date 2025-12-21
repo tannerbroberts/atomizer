@@ -1,0 +1,33 @@
+{
+  "name": "atomizer",
+  "version": "0.1.0",
+  "description": "CLI tool to reorganize React folder structure using AST traversal based on the Render Tree",
+  "main": "index.js",
+  "bin": {
+    "atomizer": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "src/"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "react",
+    "refactor",
+    "ast",
+    "folder-structure",
+    "cli"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@typescript-eslint/parser": "^8.50.0",
+    "@typescript-eslint/typescript-estree": "^8.50.0",
+    "chalk": "^4.1.2",
+    "commander": "^14.0.2",
+    "glob": "^13.0.0",
+    "typescript": "^5.9.3"
+  }
+}
