@@ -3,6 +3,8 @@
 const { program } = require('commander');
 const Atomizer = require('./src/Atomizer');
 const chalk = require('chalk');
+const path = require('path');
+const fs = require('fs');
 
 program
   .name('atomizer')
@@ -26,6 +28,30 @@ program
       } else {
         atomizer.printAnalysis(result);
       }
+    } catch (error) {
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('trace')
+  .description('Trace top-level symbols in a file and their consumers')
+  .argument('<filePath>', 'Path to the file to trace')
+  .option('--src <path>', 'Path to the src folder')
+  .action(async (filePath, options) => {
+    try {
+      const absoluteFilePath = path.resolve(filePath);
+      let srcPath = options.src ? path.resolve(options.src) : path.join(process.cwd(), 'src');
+      
+      if (!options.src && (!fs.existsSync(srcPath) || !fs.statSync(srcPath).isDirectory())) {
+        throw new Error(`Could not find 'src' folder in ${process.cwd()}. Use --src <path> to specify the source folder.`);
+      }
+      
+      const atomizer = new Atomizer(srcPath, options);
+      const symbols = await atomizer.trace(absoluteFilePath);
+      
+      atomizer.printTrace(absoluteFilePath, symbols);
     } catch (error) {
       console.error(chalk.red('Error:'), error.message);
       process.exit(1);

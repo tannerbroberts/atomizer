@@ -6,6 +6,7 @@ const GraphBuilder = require('./GraphBuilder');
 const StructureComputer = require('./StructureComputer');
 const Migrator = require('./Migrator');
 const FileSplitter = require('./FileSplitter');
+const SymbolTracer = require('./SymbolTracer');
 
 class Atomizer {
   constructor(srcPath, options = {}) {
@@ -73,6 +74,52 @@ class Atomizer {
       dependencyGraph,
       newStructure,
     };
+  }
+
+  async trace(targetFilePath) {
+    const absolutePath = path.resolve(targetFilePath);
+    console.log(chalk.blue(`🔍 Tracing symbols in: ${targetFilePath}`));
+    
+    // We still need to analyze the whole project to find external consumers
+    console.log(chalk.yellow('Step 1: Scanning files...'));
+    const inventory = new FileInventory(this.srcPath);
+    const files = await inventory.scan();
+    console.log(chalk.green(`   ✓ Found ${files.length} files`));
+
+    console.log(chalk.yellow('Step 2: Analyzing ASTs...'));
+    const analyzer = new ASTAnalyzer(this.srcPath, this.options);
+    const analysisResults = await analyzer.analyzeAll(files);
+    console.log(chalk.green('   ✓ Analysis complete'));
+
+    console.log(chalk.yellow('Step 3: Tracing symbols...'));
+    const tracer = new SymbolTracer(this.srcPath, analysisResults);
+    return tracer.trace(absolutePath);
+  }
+
+  printTrace(filePath, symbols) {
+    console.log(chalk.blue('\n═══════════════════════════════════════'));
+    console.log(chalk.blue(`           TRACE: ${path.relative(this.srcPath, filePath)}`));
+    console.log(chalk.blue('═══════════════════════════════════════\n'));
+
+    for (const symbol of symbols) {
+      const exportStatus = symbol.isExported ? chalk.green('[EXPORTED]') : chalk.gray('[INTERNAL]');
+      console.log(`${exportStatus} ${chalk.white.bold(symbol.name)} (${symbol.type})`);
+      
+      if (symbol.internalConsumers.length > 0) {
+        console.log(`   ${chalk.yellow('Internal Consumers:')}`);
+        symbol.internalConsumers.forEach(c => console.log(`     - ${c}`));
+      } else {
+        console.log(`   ${chalk.gray('No internal consumers')}`);
+      }
+
+      if (symbol.externalConsumers.length > 0) {
+        console.log(`   ${chalk.magenta('External Consumers:')}`);
+        symbol.externalConsumers.forEach(c => console.log(`     - ${c}`));
+      } else if (symbol.isExported) {
+        console.log(`   ${chalk.gray('No external consumers')}`);
+      }
+      console.log();
+    }
   }
 
   printAnalysis(result) {
