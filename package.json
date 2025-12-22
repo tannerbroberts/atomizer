@@ -1,10 +1,13 @@
 {
-  "name": "atomizer",
+  "name": "@tannerbroberts/atomizer",
   "version": "0.1.0",
   "description": "CLI tool to reorganize React folder structure using AST traversal based on the Render Tree",
   "main": "index.js",
   "bin": {
     "atomizer": "./index.js"
+  },
+  "scripts": {
+    "release": "node scripts/publish.js"
   },
   "files": [
     "index.js",
