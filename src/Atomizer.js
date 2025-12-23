@@ -7,6 +7,8 @@ const StructureComputer = require('./StructureComputer');
 const Migrator = require('./Migrator');
 const FileSplitter = require('./FileSplitter');
 const SymbolTracer = require('./SymbolTracer');
+const ProjectIndexer = require('./ProjectIndexer');
+const DependencyTracer = require('./DependencyTracer');
 
 class Atomizer {
   constructor(srcPath, options = {}) {
@@ -18,6 +20,168 @@ class Atomizer {
   log(message) {
     if (this.verbose) {
       console.log(chalk.gray(`[DEBUG] ${message}`));
+    }
+  }
+
+  /**
+   * Phase 1: Index all source files
+   * Creates the 4 maps as described in README:
+   * - project: All top-level nodes with UUID keys
+   * - imports: Import nodes only
+   * - exports: Export nodes only
+   * - declarations: Declaration nodes only
+   */
+  async index() {
+    console.log(chalk.blue('📦 Starting Atomizer indexing (Phase 1)...'));
+    console.log(chalk.gray(`   Source: ${this.srcPath}\n`));
+
+    // Step 1: Scan for files
+    console.log(chalk.yellow('Step 1: Scanning files...'));
+    const inventory = new FileInventory(this.srcPath);
+    const files = await inventory.scan();
+    console.log(chalk.green(`   ✓ Found ${files.length} files\n`));
+
+    // Step 2: Index all top-level AST nodes with UUIDs
+    console.log(chalk.yellow('Step 2: Indexing top-level AST nodes...'));
+    const indexer = new ProjectIndexer(this.srcPath, this.options);
+    const maps = await indexer.indexAll(files);
+    
+    const stats = indexer.getStats();
+    console.log(chalk.green(`   ✓ Total nodes:       ${stats.totalNodes}`));
+    console.log(chalk.green(`   ✓ Import nodes:      ${stats.importNodes}`));
+    console.log(chalk.green(`   ✓ Export nodes:      ${stats.exportNodes}`));
+    console.log(chalk.green(`   ✓ Declaration nodes: ${stats.declarationNodes}\n`));
+
+    return {
+      indexer,
+      maps,
+      stats,
+      files,
+    };
+  }
+
+  /**
+   * Phase 2: Trace declaration dependencies
+   * For each declaration, finds:
+   * - Internal dependants: Other top-level nodes in same file that use it
+   * - External dependants: Nodes in other files that import and use it
+   */
+  async traceAllDependencies() {
+    // First, run the indexing phase
+    const { indexer, maps, stats, files } = await this.index();
+
+    console.log(chalk.yellow('Step 3: Tracing declaration dependencies...'));
+    const tracer = new DependencyTracer(indexer);
+    const traced = tracer.traceAll();
+    
+    const summary = tracer.getSummary();
+    console.log(chalk.green(`   ✓ Traced ${summary.totalDeclarations} declarations`));
+    console.log(chalk.green(`   ✓ With internal dependants: ${summary.withInternalDependants}`));
+    console.log(chalk.green(`   ✓ With external dependants: ${summary.withExternalDependants}`));
+    console.log(chalk.green(`   ✓ Orphaned (no dependants): ${summary.orphaned}\n`));
+
+    return {
+      indexer,
+      tracer,
+      maps,
+      traced,
+      stats,
+      summary,
+      files,
+    };
+  }
+
+  printIndex(result) {
+    console.log(chalk.blue('\n═══════════════════════════════════════'));
+    console.log(chalk.blue('           PROJECT INDEX'));
+    console.log(chalk.blue('═══════════════════════════════════════\n'));
+
+    const { maps, stats } = result;
+
+    console.log(chalk.cyan('📊 Statistics:'));
+    console.log(`   Total nodes:       ${stats.totalNodes}`);
+    console.log(`   Import nodes:      ${stats.importNodes}`);
+    console.log(`   Export nodes:      ${stats.exportNodes}`);
+    console.log(`   Declaration nodes: ${stats.declarationNodes}`);
+
+    console.log(chalk.cyan('\n📦 Declarations by file:'));
+    const declsByFile = new Map();
+    for (const [uuid, node] of maps.declarations) {
+      const rel = node.relativePath;
+      if (!declsByFile.has(rel)) {
+        declsByFile.set(rel, []);
+      }
+      declsByFile.get(rel).push(node);
+    }
+
+    for (const [file, decls] of declsByFile) {
+      console.log(`   ${chalk.white(file)}`);
+      for (const decl of decls) {
+        const names = decl.declaredNames.join(', ') || 'anonymous';
+        const exported = decl.isExported ? chalk.green('[exported]') : chalk.gray('[internal]');
+        console.log(`     ${exported} ${names} (${decl.nodeType})`);
+      }
+    }
+  }
+
+  printDependencyTrace(result) {
+    console.log(chalk.blue('\n═══════════════════════════════════════'));
+    console.log(chalk.blue('        DEPENDENCY TRACE RESULTS'));
+    console.log(chalk.blue('═══════════════════════════════════════\n'));
+
+    const { traced, maps, summary } = result;
+
+    console.log(chalk.cyan('📊 Summary:'));
+    console.log(`   Total declarations:        ${summary.totalDeclarations}`);
+    console.log(`   With internal dependants:  ${summary.withInternalDependants}`);
+    console.log(`   With external dependants:  ${summary.withExternalDependants}`);
+    console.log(`   Orphaned (no dependants):  ${summary.orphaned}`);
+
+    console.log(chalk.cyan('\n🔗 Declaration Dependencies:\n'));
+
+    // Group by file
+    const byFile = new Map();
+    for (const [uuid, node] of traced) {
+      const rel = node.relativePath;
+      if (!byFile.has(rel)) {
+        byFile.set(rel, []);
+      }
+      byFile.get(rel).push({ uuid, ...node });
+    }
+
+    for (const [file, nodes] of byFile) {
+      console.log(chalk.white.bold(`📄 ${file}`));
+      
+      for (const node of nodes) {
+        const names = node.declaredNames?.join(', ') || 'anonymous';
+        const exported = node.isExported ? chalk.green('[exported]') : chalk.gray('[internal]');
+        console.log(`   ${exported} ${chalk.yellow(names)}`);
+
+        if (node.dependant.internal.length > 0) {
+          console.log(`      ${chalk.blue('Internal dependants:')}`);
+          for (const depUuid of node.dependant.internal) {
+            const depNode = maps.project.get(depUuid);
+            const depNames = depNode?.names?.join(', ') || depNode?.nodeType || depUuid.slice(0, 8);
+            console.log(`        → ${depNames}`);
+          }
+        }
+
+        const externalDeps = Object.keys(node.dependant.external);
+        if (externalDeps.length > 0) {
+          console.log(`      ${chalk.magenta('External dependants:')}`);
+          for (const depUuid of externalDeps) {
+            const depNode = maps.project.get(depUuid);
+            const depFile = depNode?.relativePath || 'unknown';
+            const depNames = depNode?.names?.join(', ') || depNode?.nodeType || depUuid.slice(0, 8);
+            console.log(`        → ${depFile}: ${depNames}`);
+          }
+        }
+
+        if (node.dependant.internal.length === 0 && externalDeps.length === 0) {
+          console.log(`      ${chalk.gray('No dependants (orphaned)')}`);
+        }
+      }
+      console.log();
     }
   }
 

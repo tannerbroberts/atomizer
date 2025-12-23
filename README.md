@@ -14,6 +14,7 @@ This tool has distinct phases with an output artifact for each:
    - Keep a separate index map for exports, referencing the same objects by the same uuid key
    - Keep a separate index map for declarations, referencing the same objects by the same uuid key
    - That's a total of 4 maps: project, imports, exports, and declarations
+   - Note: declarations can be simultaneously exports, imports can be simultaneously exports, this should be accounted for.
 2. Build dependent objects:
    - For every declaration node in the project, find it's usage throughout the enire application.
       - Trace through the node's own AST for internal usage of the name within module scope, storing the uuid's of the top-level nodes within which it is found (other than itself, of course) under [uuid].dependant.internal array

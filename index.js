@@ -34,25 +34,51 @@ program
   });
 
 program
-  .command('trace')
-  .description('Trace top-level symbols in a file and their consumers')
-  .argument('<filePath>', 'Path to the file to trace')
-  .option('--src <path>', 'Path to the src folder')
-  .action(async (filePath, options) => {
+  .command('index')
+  .description('Index all top-level AST nodes in the project (Phase 1)')
+  .argument('<srcPath>', 'Path to the src folder to index')
+  .option('--json', 'Output results as JSON')
+  .option('--verbose', 'Show detailed indexing information')
+  .action(async (srcPath, options) => {
     try {
-      const absoluteFilePath = path.resolve(filePath);
-      let srcPath = options.src ? path.resolve(options.src) : path.join(process.cwd(), 'src');
-      
-      if (!options.src && (!fs.existsSync(srcPath) || !fs.statSync(srcPath).isDirectory())) {
-        throw new Error(`Could not find 'src' folder in ${process.cwd()}. Use --src <path> to specify the source folder.`);
-      }
-      
       const atomizer = new Atomizer(srcPath, options);
-      const symbols = await atomizer.trace(absoluteFilePath);
+      const result = await atomizer.index();
       
-      atomizer.printTrace(absoluteFilePath, symbols);
+      if (options.json) {
+        console.log(JSON.stringify(result.indexer.toJSON(), null, 2));
+      } else {
+        atomizer.printIndex(result);
+      }
     } catch (error) {
       console.error(chalk.red('Error:'), error.message);
+      if (options.verbose) {
+        console.error(error.stack);
+      }
+      process.exit(1);
+    }
+  });
+
+program
+  .command('trace-all')
+  .description('Trace all declarations and their dependants (Phase 1 + 2)')
+  .argument('<srcPath>', 'Path to the src folder to trace')
+  .option('--json', 'Output results as JSON')
+  .option('--verbose', 'Show detailed tracing information')
+  .action(async (srcPath, options) => {
+    try {
+      const atomizer = new Atomizer(srcPath, options);
+      const result = await atomizer.traceAllDependencies();
+      
+      if (options.json) {
+        console.log(JSON.stringify(result.tracer.toJSON(), null, 2));
+      } else {
+        atomizer.printDependencyTrace(result);
+      }
+    } catch (error) {
+      console.error(chalk.red('Error:'), error.message);
+      if (options.verbose) {
+        console.error(error.stack);
+      }
       process.exit(1);
     }
   });
