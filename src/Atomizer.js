@@ -195,6 +195,20 @@ class Atomizer {
     const files = await inventory.scan();
     console.log(chalk.green(`   ✓ Found ${files.length} files\n`));
 
+    // Step 1b: Index all top-level AST nodes with UUIDs for dependency tracing
+    console.log(chalk.yellow('Step 1b: Indexing AST nodes...'));
+    const indexer = new ProjectIndexer(this.srcPath, this.options);
+    await indexer.indexAll(files);
+    console.log(chalk.green(`   ✓ Indexed ${indexer.getStats().totalNodes} nodes\n`));
+
+    // Step 1c: Trace declaration dependencies
+    console.log(chalk.yellow('Step 1c: Tracing declaration dependencies...'));
+    const tracer = new DependencyTracer(indexer);
+    const traced = tracer.traceAll();
+    const tracerSummary = tracer.getSummary();
+    console.log(chalk.green(`   ✓ Traced ${tracerSummary.totalDeclarations} declarations`));
+    console.log(chalk.green(`   ✓ With external dependants: ${tracerSummary.withExternalDependants}\n`));
+
     // Step 2: AST Analysis & Resolution
     console.log(chalk.yellow('Step 2: AST Analysis & Module Resolution'));
     const analyzer = new ASTAnalyzer(this.srcPath, this.options);
@@ -221,7 +235,8 @@ class Atomizer {
       analysisResults,
       renderTree,
       dependencyGraph,
-      this.srcPath
+      this.srcPath,
+      tracer  // Pass the dependency tracer for precise dependency info
     );
     const newStructure = structureComputer.compute();
     console.log(chalk.green(`   ✓ Computed ${newStructure.moves.length} file moves\n`));
@@ -233,6 +248,8 @@ class Atomizer {
       renderTree,
       dependencyGraph,
       newStructure,
+      tracer,  // Include tracer for downstream use
+      traced,  // Include traced declarations
     };
   }
 
@@ -377,32 +394,16 @@ class Atomizer {
     }
   }
 
-  async execute(result, outputPath, options = {}) {
+  /**
+   * Execute the migration using traced dependency data
+   * The Migrator solely consumes traced data and applies atom rules
+   */
+  async execute(traceResult, outputPath, options = {}) {
     const targetPath = outputPath || path.join(path.dirname(this.srcPath), 'atomicSrc');
 
-    // Always split multi-export files in atomic mode
-    const filesToSplit = result.files.filter(f => 
-      (f.exportedHooks?.length + f.exportedComponents?.length) > 1
-    );
-    
-    if (filesToSplit.length > 0) {
-      console.log(chalk.blue('\n✂️  Splitting multi-export files...'));
-      const splitter = new FileSplitter(this.srcPath, this.options);
-      const { splitOperations, updatedPaths, importRewrites } = 
-        splitter.computeSplits(filesToSplit, result.newStructure.newPaths);
-      
-      // Execute the splits directly into the target path
-      await splitter.execute(splitOperations, targetPath);
-      
-      // Update the structure with new paths
-      result.newStructure.newPaths = updatedPaths;
-      result.newStructure.splitImportRewrites = importRewrites;
-      
-      console.log(chalk.green(`   ✓ Split ${filesToSplit.length} file(s)\n`));
-    }
-    
-    const migrator = new Migrator(this.srcPath, targetPath, result.files);
-    await migrator.execute(result.newStructure);
+    // Migrator now solely works with traced data
+    const migrator = new Migrator(this.srcPath, targetPath, traceResult.tracer);
+    await migrator.execute();
   }
 }
 

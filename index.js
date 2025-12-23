@@ -85,24 +85,33 @@ program
 
 program
   .command('run')
-  .description('Execute the reorganization (creates a migration plan)')
-  .argument('<srcPath>', 'Path to the src folder to reorganize')
+  .description('Execute the reorganization based on traced dependencies')
+  .argument('[srcPath]', 'Path to the src folder to reorganize', './src')
   .option('--dry-run', 'Show what would be done without making changes')
   .option('--output <path>', 'Output directory for reorganized structure')
+  .option('--verbose', 'Show detailed information')
   .action(async (srcPath, options) => {
     try {
-      const atomizer = new Atomizer(srcPath, options);
-      const result = await atomizer.analyze();
+      const resolvedSrcPath = path.resolve(srcPath);
+      const atomizer = new Atomizer(resolvedSrcPath, options);
+      
+      // Use the traced dependency data flow
+      const traceResult = await atomizer.traceAllDependencies();
       
       if (options.dryRun) {
-        atomizer.printMigrationPlan(result);
+        // Show what the migration would do
+        atomizer.printDependencyTrace(traceResult);
+        console.log(chalk.yellow('\n[DRY RUN] No files were modified.'));
       } else {
-        const outputPath = options.output || path.join(path.dirname(path.resolve(srcPath)), 'atomicSrc');
-        await atomizer.execute(result, outputPath, options);
+        const outputPath = options.output || path.resolve('./atomicSrc');
+        await atomizer.execute(traceResult, outputPath, options);
         console.log(chalk.green(`✓ Reorganization complete! New structure created at: ${outputPath}`));
       }
     } catch (error) {
       console.error(chalk.red('Error:'), error.message);
+      if (options.verbose) {
+        console.error(error.stack);
+      }
       process.exit(1);
     }
   });

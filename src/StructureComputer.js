@@ -13,15 +13,29 @@ const path = require('path');
  *   7. Assets are the ONLY exception - they can be loose files inside a component folder
  */
 class StructureComputer {
-  constructor(files, renderTree, dependencyGraph, srcPath) {
+  constructor(files, renderTree, dependencyGraph, srcPath, tracer = null) {
     this.files = files;
     this.renderTree = renderTree;
     this.dependencyGraph = dependencyGraph;
     this.srcPath = srcPath;
+    this.tracer = tracer;  // DependencyTracer for precise declaration-level dependencies
     
     this.fileMap = new Map();
     for (const file of files) {
       this.fileMap.set(file.filePath, file);
+    }
+    
+    // Build a map from file path to traced declarations for quick lookup
+    this.fileToTracedDeclarations = new Map();
+    if (tracer) {
+      const traced = tracer.traceAll();
+      for (const [uuid, node] of traced) {
+        const filePath = node.filePath;
+        if (!this.fileToTracedDeclarations.has(filePath)) {
+          this.fileToTracedDeclarations.set(filePath, []);
+        }
+        this.fileToTracedDeclarations.get(filePath).push({ uuid, ...node });
+      }
     }
   }
 
@@ -309,6 +323,12 @@ class StructureComputer {
    * Support files also become folders with index files (no loose files).
    * 
    * This uses an iterative approach to handle dependencies between support files.
+   * 
+   * When a DependencyTracer is available, uses precise declaration-level dependency
+   * information instead of just file-level imports. This correctly handles:
+   * - Re-exports through barrel files
+   * - Multiple exports from the same file with different consumers
+   * - Internal vs external usage tracking
    */
   computeSupportFilePaths(atomicPaths) {
     const paths = new Map();
@@ -340,7 +360,8 @@ class StructureComputer {
           continue;
         }
 
-        const importers = this.dependencyGraph.getParents(file.filePath);
+        // Use tracer for precise dependency info if available, otherwise fall back to file-level graph
+        const importers = this.getExternalConsumers(file.filePath);
         
         // Check if all importers are resolved
         const allImportersResolved = importers.every(imp => allPaths.has(imp));
@@ -468,6 +489,45 @@ class StructureComputer {
     }
 
     return path.join(this.srcPath, ...commonParts);
+  }
+
+  /**
+   * Get all external consumers (files that depend on declarations in this file).
+   * Uses DependencyTracer for precise dependency tracking when available,
+   * which correctly handles:
+   * - Re-exports through barrel files
+   * - Following import chains
+   * - Distinguishing actual usage from just importing
+   * 
+   * Falls back to file-level dependency graph if tracer is not available.
+   * 
+   * @param {string} filePath - The file to find consumers for
+   * @returns {string[]} - Array of file paths that consume exports from this file
+   */
+  getExternalConsumers(filePath) {
+    // If we have tracer data, use precise declaration-level dependencies
+    if (this.tracer && this.fileToTracedDeclarations.has(filePath)) {
+      const tracedDeclarations = this.fileToTracedDeclarations.get(filePath);
+      const consumerFilePaths = new Set();
+      
+      for (const declaration of tracedDeclarations) {
+        // Get all external dependants for this declaration
+        const externalDeps = Object.keys(declaration.dependant?.external || {});
+        
+        for (const depUuid of externalDeps) {
+          // Look up the file path for this consumer UUID
+          const consumerNode = this.tracer.indexer.project.get(depUuid);
+          if (consumerNode && consumerNode.filePath && consumerNode.filePath !== filePath) {
+            consumerFilePaths.add(consumerNode.filePath);
+          }
+        }
+      }
+      
+      return Array.from(consumerFilePaths);
+    }
+    
+    // Fallback: use simple file-level dependency graph
+    return this.dependencyGraph.getParents(filePath);
   }
 
   /**
