@@ -140,14 +140,57 @@ class DependencyTracer {
 
       // 2. Find external usage if the declaration is exported
       if (node.isExported || this.isNameExported(name, node.filePath)) {
-        const externalUuids = this.findExternalUsage(name, node.filePath, new Set());
-        for (const externalUuid of externalUuids) {
-          result.dependant.external[externalUuid] = true;
+        // Get the exported name(s) for this declared name
+        // For default exports, the declared name is e.g. "EndSlides" but the exported name is "default"
+        const exportedNames = this.getExportedNamesForDeclaredName(name, node);
+        
+        for (const exportedName of exportedNames) {
+          const externalUuids = this.findExternalUsage(exportedName, node.filePath, new Set());
+          for (const externalUuid of externalUuids) {
+            result.dependant.external[externalUuid] = true;
+          }
         }
       }
     }
 
     return result;
+  }
+
+  /**
+   * Get the exported name(s) for a declared name
+   * For example, if a function "EndSlides" is exported as default, returns ["default"]
+   * For named exports like "export const foo", returns ["foo"]
+   */
+  getExportedNamesForDeclaredName(declaredName, node) {
+    const exportedNames = [];
+    
+    // Check the node's own exportedNames first
+    for (const exp of node.exportedNames || []) {
+      if (exp.local === declaredName) {
+        exportedNames.push(exp.exported);
+      }
+    }
+    
+    // If the node itself doesn't have export info, check separate export statements
+    if (exportedNames.length === 0) {
+      const exportUuids = this.fileToExports.get(node.filePath) || [];
+      for (const exportUuid of exportUuids) {
+        const exportNode = this.exports.get(exportUuid);
+        for (const exp of exportNode.exportedNames || []) {
+          if (exp.local === declaredName) {
+            exportedNames.push(exp.exported);
+          }
+        }
+      }
+    }
+    
+    // Fallback: if no export mapping found, use the declared name itself
+    // (this handles cases like `export const foo = ...` where local === exported)
+    if (exportedNames.length === 0) {
+      exportedNames.push(declaredName);
+    }
+    
+    return exportedNames;
   }
 
   /**
