@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { parse } = require('@typescript-eslint/typescript-estree');
+const ScopeAnalyzer = require('./ScopeAnalyzer');
 
 /**
  * DependencyTracer - Phase 2 of the Atomizer pipeline
@@ -26,6 +27,7 @@ class DependencyTracer {
     this.imports = indexer.imports;
     this.exports = indexer.exports;
     this.declarations = indexer.declarations;
+    this.scopeAnalyzer = new ScopeAnalyzer();
     
     // Build lookup indices for faster tracing
     this.fileToNodes = this.buildFileToNodesMap();
@@ -392,20 +394,58 @@ class DependencyTracer {
   }
 
   /**
-   * Check if an identifier is used in code (not in strings or comments)
+   * Check if an identifier is used in code (not in strings, comments, or regex literals)
+   * Uses scope-aware analysis to handle variable shadowing correctly.
+   * Also excludes object property keys that just happen to match the identifier name.
+   * 
+   * @param {string} code - The code to check
+   * @param {string} identifier - The identifier to look for
+   * @param {boolean} useScopeAnalysis - Whether to use full AST-based scope analysis (slower but accurate)
+   * @returns {boolean} - True if the identifier is used
    */
-  isIdentifierUsedInCode(code, identifier) {
-    // Remove string literals
-    const codeWithoutStrings = code
-      .replace(/`(?:[^`\\]|\\.)*`/g, '""')  // Template literals
-      .replace(/'(?:[^'\\]|\\.)*'/g, '""')  // Single-quoted strings
-      .replace(/"(?:[^"\\]|\\.)*"/g, '""')  // Double-quoted strings
-      .replace(/\/\/.*$/gm, '')              // Single-line comments
-      .replace(/\/\*[\s\S]*?\*\//g, '');     // Multi-line comments
+  isIdentifierUsedInCode(code, identifier, useScopeAnalysis = true) {
+    // Determine if code is JSX based on content
+    const isJsx = /<[A-Z][a-zA-Z]*/.test(code) || /\/>/.test(code);
+    
+    // Try scope-aware analysis first (handles shadowing correctly)
+    if (useScopeAnalysis) {
+      try {
+        return this.scopeAnalyzer.isModuleScopeIdentifierUsed(code, identifier, isJsx);
+      } catch (e) {
+        // Fall back to regex if parsing fails
+      }
+    }
+    
+    // Fallback: regex-based check (doesn't handle shadowing)
+    return this.regexIdentifierCheck(code, identifier);
+  }
 
-    // Match whole word only
-    const regex = new RegExp(`\\b${this.escapeRegExp(identifier)}\\b`);
-    return regex.test(codeWithoutStrings);
+  /**
+   * Regex-based identifier check (fallback when AST parsing fails)
+   */
+  regexIdentifierCheck(code, identifier) {
+    // Remove string literals (handling escaped quotes)
+    let cleaned = code
+      .replace(/`(?:[^`\\]|\\.)*`/g, '""')     // Template literals
+      .replace(/'(?:[^'\\]|\\.)*'/g, '""')     // Single-quoted strings
+      .replace(/"(?:[^"\\]|\\.)*"/g, '""')     // Double-quoted strings
+      .replace(/\/\/.*$/gm, '')                 // Single-line comments
+      .replace(/\/\*[\s\S]*?\*\//g, '')         // Multi-line comments
+      .replace(/\/(?:[^/\\]|\\.)+\/[gimsuy]*/g, '""'); // Regex literals
+
+    // Remove object property keys (identifier followed by colon, not ::)
+    // This handles { identifier: value } but not { identifier } (shorthand)
+    const propKeyRegex = new RegExp(
+      `([{,]\\s*)${this.escapeRegExp(identifier)}(\\s*:)(?!:)`,
+      'g'
+    );
+    cleaned = cleaned.replace(propKeyRegex, '$1__REMOVED__$2');
+
+    // Match whole word only using word boundaries
+    // For Unicode support, we also check that the character before/after isn't a valid identifier char
+    const escapedId = this.escapeRegExp(identifier);
+    const regex = new RegExp(`(?<![\\p{L}\\p{N}_$])${escapedId}(?![\\p{L}\\p{N}_$])`, 'u');
+    return regex.test(cleaned);
   }
 
   /**
