@@ -59,7 +59,7 @@ program
   });
 
 program
-  .command('trace-all')
+  .command('trace')
   .description('Trace all declarations and their dependants (Phase 1 + 2)')
   .argument('<srcPath>', 'Path to the src folder to trace')
   .option('--json', 'Output results as JSON')
