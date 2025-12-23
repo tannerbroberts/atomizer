@@ -10,16 +10,16 @@ class FileSplitter {
 
   /**
    * Split files with multiple exported hooks/components into separate files
-   * @param {Array} filesWithViolations - Files that have violations
+   * @param {Array} filesToSplit - Files that have multiple exports
    * @param {Map} newPaths - The computed new paths for all files
    * @returns {Object} - { splitOperations, updatedPaths, importRewrites }
    */
-  computeSplits(filesWithViolations, newPaths) {
+  computeSplits(filesToSplit, newPaths) {
     const splitOperations = [];
     const updatedPaths = new Map(newPaths);
     const importRewrites = new Map();
 
-    for (const file of filesWithViolations) {
+    for (const file of filesToSplit) {
       const result = this.splitFile(file, updatedPaths);
       splitOperations.push(...result.operations);
       
@@ -566,25 +566,21 @@ class FileSplitter {
   /**
    * Execute the split operations
    */
-  async execute(splitOperations) {
+  async execute(splitOperations, outputPath) {
     for (const op of splitOperations) {
-      if (op.type === 'create') {
+      if (op.type === 'create' || op.type === 'update') {
+        // Map path to output directory if provided
+        const targetPath = outputPath ? op.filePath.replace(this.srcPath, outputPath) : op.filePath;
+        
         // Ensure directory exists
-        const dir = path.dirname(op.filePath);
+        const dir = path.dirname(targetPath);
         if (!fs.existsSync(dir)) {
           fs.mkdirSync(dir, { recursive: true });
         }
-        fs.writeFileSync(op.filePath, op.content, 'utf-8');
-        console.log(`  Created: ${path.relative(this.srcPath, op.filePath)}`);
-      } else if (op.type === 'update') {
-        fs.writeFileSync(op.filePath, op.content, 'utf-8');
-        console.log(`  Updated: ${path.relative(this.srcPath, op.filePath)}`);
-      } else if (op.type === 'delete') {
-        if (fs.existsSync(op.filePath)) {
-          fs.unlinkSync(op.filePath);
-          console.log(`  Deleted: ${path.relative(this.srcPath, op.filePath)}`);
-        }
+        fs.writeFileSync(targetPath, op.content, 'utf-8');
+        console.log(`  ${op.type === 'create' ? 'Created' : 'Updated'}: ${path.relative(outputPath || this.srcPath, targetPath)}`);
       }
+      // Skip 'delete' operations as we are copying, not moving
     }
   }
 }

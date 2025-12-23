@@ -17,7 +17,6 @@ program
   .argument('<srcPath>', 'Path to the src folder to analyze')
   .option('--json', 'Output results as JSON')
   .option('--verbose', 'Show detailed analysis information')
-  .option('--silent', 'Suppress warnings about multi-export files')
   .action(async (srcPath, options) => {
     try {
       const atomizer = new Atomizer(srcPath, options);
@@ -64,61 +63,22 @@ program
   .argument('<srcPath>', 'Path to the src folder to reorganize')
   .option('--dry-run', 'Show what would be done without making changes')
   .option('--output <path>', 'Output directory for reorganized structure')
-  .option('--silent', 'Suppress warnings about multi-export files')
-  .option('--split', 'Automatically split multi-export files (no prompt)')
-  .option('--no-split', 'Skip splitting multi-export files (no prompt)')
   .action(async (srcPath, options) => {
     try {
       const atomizer = new Atomizer(srcPath, options);
       const result = await atomizer.analyze();
       
-      // Check for violations and handle split decision
-      const violations = result.files.filter(f => f.violations?.length > 0);
-      
-      if (violations.length > 0 && !options.silent) {
-        atomizer.printViolations(violations);
-        
-        // Determine split behavior
-        let shouldSplit = options.split;
-        
-        if (shouldSplit === undefined && !options.dryRun) {
-          // Interactive prompt
-          shouldSplit = await promptYesNo(
-            `\n${chalk.yellow('?')} Split ${violations.length} multi-export file(s) into separate files? (y/n) `
-          );
-        }
-        
-        if (shouldSplit) {
-          options.splitFiles = true;
-        }
-      }
-      
       if (options.dryRun) {
         atomizer.printMigrationPlan(result);
       } else {
-        await atomizer.execute(result, options.output, options);
-        console.log(chalk.green('✓ Reorganization complete!'));
+        const outputPath = options.output || path.join(path.dirname(path.resolve(srcPath)), 'atomicSrc');
+        await atomizer.execute(result, outputPath, options);
+        console.log(chalk.green(`✓ Reorganization complete! New structure created at: ${outputPath}`));
       }
     } catch (error) {
       console.error(chalk.red('Error:'), error.message);
       process.exit(1);
     }
   });
-
-// Simple yes/no prompt
-function promptYesNo(question) {
-  return new Promise((resolve) => {
-    const readline = require('readline');
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-    
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer.toLowerCase().startsWith('y'));
-    });
-  });
-}
 
 program.parse();

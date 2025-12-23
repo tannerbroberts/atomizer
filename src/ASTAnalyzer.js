@@ -172,7 +172,6 @@ class ASTAnalyzer {
     // Analyze exported hooks and components for single-export rule
     const exportedHooks = exports.filter(e => e.isHook);
     const exportedComponents = exports.filter(e => e.isComponent);
-    const violations = this.detectViolations(exportedHooks, exportedComponents, file);
 
     return {
       ...file,
@@ -182,7 +181,6 @@ class ASTAnalyzer {
       exports,
       exportedHooks,
       exportedComponents,
-      violations,
       jsxElements,
       hasJSXReturn,
     };
@@ -587,48 +585,6 @@ class ASTAnalyzer {
     return false;
   }
   
-  detectViolations(exportedHooks, exportedComponents, file) {
-    const violations = [];
-    
-    const totalCriticalExports = exportedHooks.length + exportedComponents.length;
-    
-    if (totalCriticalExports > 1) {
-      violations.push({
-        type: 'multiple-exports',
-        message: `File exports ${exportedHooks.length} hooks and ${exportedComponents.length} components (should have max 1 total)`,
-        hooks: exportedHooks.map(h => h.name),
-        components: exportedComponents.map(c => c.name),
-        suggestion: this.generateSplitSuggestion(exportedHooks, exportedComponents, file),
-      });
-    }
-    
-    return violations;
-  }
-  
-  generateSplitSuggestion(hooks, components, file) {
-    const suggestions = [];
-    const baseName = file.name;
-    const ext = file.extension;
-    
-    for (const hook of hooks) {
-      suggestions.push({
-        exportName: hook.name,
-        newFile: `${hook.name}${ext}`,
-        type: 'hook',
-      });
-    }
-    
-    for (const comp of components) {
-      suggestions.push({
-        exportName: comp.name,
-        newFile: `${comp.name}/index${ext}`,
-        type: 'component',
-      });
-    }
-    
-    return suggestions;
-  }
-
   extractJSXElements(ast) {
     const elements = [];
 

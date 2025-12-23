@@ -38,14 +38,10 @@ class Atomizer {
     
     const components = analysisResults.filter(f => f.classification === 'component');
     const nonComponents = analysisResults.filter(f => f.classification !== 'component');
-    const filesWithViolations = analysisResults.filter(f => f.violations?.length > 0);
     
     console.log(chalk.green(`   ✓ Components: ${components.length}`));
     console.log(chalk.green(`   ✓ Non-Components: ${nonComponents.length}`));
     
-    if (filesWithViolations.length > 0 && !this.options.silent) {
-      console.log(chalk.yellow(`   ⚠ Multi-export violations: ${filesWithViolations.length} files`));
-    }
     console.log();
 
     // Step 3: Build Dual Graphs
@@ -202,9 +198,9 @@ class Atomizer {
 
     const { moves, importUpdates } = result.newStructure;
 
-    console.log(chalk.cyan('📦 File Moves:'));
+    console.log(chalk.cyan('📦 File Copies:'));
     for (const move of moves) {
-      console.log(`   ${chalk.yellow('MOVE')} ${move.from}`);
+      console.log(`   ${chalk.yellow('COPY')} ${move.from}`);
       console.log(`        → ${move.to}`);
     }
 
@@ -217,65 +213,31 @@ class Atomizer {
     }
   }
 
-  printViolations(filesWithViolations) {
-    console.log(chalk.yellow('\n═══════════════════════════════════════'));
-    console.log(chalk.yellow('      ⚠ MULTI-EXPORT VIOLATIONS'));
-    console.log(chalk.yellow('═══════════════════════════════════════\n'));
-    
-    console.log(chalk.gray('Files with multiple exported hooks/components:\n'));
-    
-    for (const file of filesWithViolations) {
-      const relativePath = path.relative(this.srcPath, file.filePath);
-      console.log(chalk.red(`  ✗ ${relativePath}`));
-      
-      for (const violation of file.violations) {
-        if (violation.hooks?.length > 0) {
-          console.log(chalk.gray(`    Hooks: `) + chalk.cyan(violation.hooks.join(', ')));
-        }
-        if (violation.components?.length > 0) {
-          console.log(chalk.gray(`    Components: `) + chalk.magenta(violation.components.join(', ')));
-        }
-        
-        if (violation.suggestion?.length > 0) {
-          console.log(chalk.gray(`    Split into:`));
-          for (const s of violation.suggestion) {
-            const icon = s.type === 'hook' ? '⚓' : '📦';
-            console.log(chalk.green(`      ${icon} ${s.newFile}`) + chalk.gray(` (${s.exportName})`));
-          }
-        }
-      }
-      console.log();
-    }
-    
-    console.log(chalk.gray(`Use --split to automatically split these files.`));
-    console.log(chalk.gray(`Use --silent to suppress these warnings.\n`));
-  }
-
   async execute(result, outputPath, options = {}) {
-    const shouldSplit = options.splitFiles || this.options.splitFiles;
+    const targetPath = outputPath || path.join(path.dirname(this.srcPath), 'atomicSrc');
+
+    // Always split multi-export files in atomic mode
+    const filesToSplit = result.files.filter(f => 
+      (f.exportedHooks?.length + f.exportedComponents?.length) > 1
+    );
     
-    // Handle file splitting first if requested
-    if (shouldSplit) {
-      const filesWithViolations = result.files.filter(f => f.violations?.length > 0);
+    if (filesToSplit.length > 0) {
+      console.log(chalk.blue('\n✂️  Splitting multi-export files...'));
+      const splitter = new FileSplitter(this.srcPath, this.options);
+      const { splitOperations, updatedPaths, importRewrites } = 
+        splitter.computeSplits(filesToSplit, result.newStructure.newPaths);
       
-      if (filesWithViolations.length > 0) {
-        console.log(chalk.blue('\n✂️  Splitting multi-export files...'));
-        const splitter = new FileSplitter(this.srcPath, this.options);
-        const { splitOperations, updatedPaths, importRewrites } = 
-          splitter.computeSplits(filesWithViolations, result.newStructure.newPaths);
-        
-        // Execute the splits
-        await splitter.execute(splitOperations);
-        
-        // Update the structure with new paths
-        result.newStructure.newPaths = updatedPaths;
-        result.newStructure.splitImportRewrites = importRewrites;
-        
-        console.log(chalk.green(`   ✓ Split ${filesWithViolations.length} file(s)\n`));
-      }
+      // Execute the splits directly into the target path
+      await splitter.execute(splitOperations, targetPath);
+      
+      // Update the structure with new paths
+      result.newStructure.newPaths = updatedPaths;
+      result.newStructure.splitImportRewrites = importRewrites;
+      
+      console.log(chalk.green(`   ✓ Split ${filesToSplit.length} file(s)\n`));
     }
     
-    const migrator = new Migrator(this.srcPath, outputPath || this.srcPath, result.files);
+    const migrator = new Migrator(this.srcPath, targetPath, result.files);
     await migrator.execute(result.newStructure);
   }
 }
