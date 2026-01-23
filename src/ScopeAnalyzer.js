@@ -2,7 +2,7 @@ const { parse } = require('@typescript-eslint/typescript-estree');
 
 /**
  * ScopeAnalyzer - Performs scope-aware identifier usage analysis
- * 
+ *
  * This class properly handles variable shadowing by tracking which
  * identifiers are declared in each scope.
  */
@@ -15,7 +15,7 @@ class ScopeAnalyzer {
    * Check if an identifier from module scope is used within a piece of code
    * This properly handles shadowing - if the identifier is redeclared in a nested scope,
    * usages in that scope don't count as using the module-level declaration.
-   * 
+   *
    * @param {string} code - The code to analyze
    * @param {string} identifier - The identifier to look for
    * @param {boolean} isJsx - Whether to parse as JSX
@@ -33,11 +33,11 @@ class ScopeAnalyzer {
         errorOnUnknownASTType: false,
       });
     } catch (e) {
-      // If parsing fails, fall back to regex-based check
+
       return this.regexFallback(code, identifier);
     }
 
-    // Track scopes and check for usage
+
     return this.findUsageInNode(ast, identifier, new Set(), null);
   }
 
@@ -54,42 +54,42 @@ class ScopeAnalyzer {
       return false;
     }
 
-    // Check if this node is an identifier reference to our target
+
     if (node.type === 'Identifier' && node.name === identifier) {
-      // Skip if this is a property key in an object literal (not shorthand)
+
       if (parent?.type === 'Property' && parent.key === node && !parent.shorthand) {
         return false;
       }
-      // Skip if this is a member expression property (e.g., obj.identifier)
+
       if (parent?.type === 'MemberExpression' && parent.property === node && !parent.computed) {
         return false;
       }
-      // Only count if not shadowed
+
       if (!shadowedNames.has(identifier)) {
         return true;
       }
       return false;
     }
 
-    // Handle JSX identifiers (used in JSX elements like <MyComponent />)
+
     if (node.type === 'JSXIdentifier' && node.name === identifier) {
-      // Only count if not shadowed
+
       if (!shadowedNames.has(identifier)) {
         return true;
       }
       return false;
     }
 
-    // Handle nodes that create new scopes and may declare variables
+
     if (this.createsScope(node)) {
       const newShadowed = new Set(shadowedNames);
       this.collectDeclaredNames(node, newShadowed);
-      
-      // Check children with potentially updated shadow set
+
+
       return this.checkChildren(node, identifier, newShadowed);
     }
 
-    // For other nodes, just check children
+
     return this.checkChildren(node, identifier, shadowedNames);
   }
 
@@ -99,9 +99,9 @@ class ScopeAnalyzer {
   checkChildren(node, identifier, shadowedNames) {
     for (const key of Object.keys(node)) {
       if (key === 'parent' || key === 'range' || key === 'loc') continue;
-      
+
       const child = node[key];
-      
+
       if (Array.isArray(child)) {
         for (const item of child) {
           if (this.findUsageInNode(item, identifier, shadowedNames, node)) {
@@ -143,11 +143,11 @@ class ScopeAnalyzer {
       case 'FunctionDeclaration':
       case 'FunctionExpression':
       case 'ArrowFunctionExpression':
-        // Function parameters shadow module scope
+
         for (const param of node.params || []) {
           this.collectPatternNames(param, shadowedNames);
         }
-        // Function name in function expression is also in scope
+
         if (node.id?.name) {
           shadowedNames.add(node.id.name);
         }
@@ -163,7 +163,7 @@ class ScopeAnalyzer {
       case 'ForStatement':
       case 'ForInStatement':
       case 'ForOfStatement':
-        // Collect let/const/var declarations at the start of block
+
         this.collectBlockDeclarations(node, shadowedNames);
         break;
 
@@ -182,15 +182,15 @@ class ScopeAnalyzer {
   collectBlockDeclarations(node, shadowedNames) {
     const body = node.body || [];
     const statements = Array.isArray(body) ? body : [body];
-    
-    // Also check init for for-loops
+
+
     if (node.init?.type === 'VariableDeclaration') {
       for (const decl of node.init.declarations) {
         this.collectPatternNames(decl.id, shadowedNames);
       }
     }
-    
-    // Check left for for-in/for-of
+
+
     if (node.left?.type === 'VariableDeclaration') {
       for (const decl of node.left.declarations) {
         this.collectPatternNames(decl.id, shadowedNames);
@@ -203,7 +203,7 @@ class ScopeAnalyzer {
           this.collectPatternNames(decl.id, shadowedNames);
         }
       }
-      // Also handle function declarations in block (hoisted)
+
       if (stmt?.type === 'FunctionDeclaration' && stmt.id?.name) {
         shadowedNames.add(stmt.id.name);
       }
@@ -253,7 +253,7 @@ class ScopeAnalyzer {
    * Fallback regex-based check for when parsing fails
    */
   regexFallback(code, identifier) {
-    // Remove strings and comments
+
     const cleaned = code
       .replace(/`(?:[^`\\]|\\.)*`/g, '""')
       .replace(/'(?:[^'\\]|\\.)*'/g, '""')

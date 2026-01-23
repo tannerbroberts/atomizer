@@ -1,6 +1,6 @@
 /**
  * Advanced Bug-Finding Tests
- * 
+ *
  * These tests are designed to find subtle bugs in usage tracking
  */
 
@@ -37,40 +37,40 @@ async function runIndexer(fixturePath) {
   return indexer;
 }
 
-// ============================================================================
-// BUG TEST 1: Namespace property access (NS.foo) tracking
-// ============================================================================
+
+
+
 async function testNamespacePropertyAccess() {
   console.log('\n🔍 BUG TEST: Namespace property access tracking');
-  
+
   const indexer = await runIndexer(FIXTURES_PATH);
   const tracer = new DependencyTracer(indexer);
-  
-  // Find the 'alpha' declaration from namespace-import.ts
+
+
   let alphaDecl = null;
   for (const [uuid, node] of indexer.declarations) {
-    if ((node.declaredNames || []).includes('alpha') && 
+    if ((node.declaredNames || []).includes('alpha') &&
         node.filePath?.includes('namespace-import.ts')) {
       alphaDecl = { uuid, node };
       break;
     }
   }
-  
+
   if (!alphaDecl) {
     reportBug('Namespace test setup', 'alpha declaration found', 'not found');
     return;
   }
-  
+
   const traced = tracer.traceAll();
   const tracedAlpha = traced.get(alphaDecl.uuid);
-  
+
   const externalConsumers = Object.keys(tracedAlpha?.dependant?.external || {});
-  
-  // The namespace-consumer.ts uses NS.alpha, which should be traced
-  // But this requires analyzing the namespace pattern, not just direct imports
-  // Current implementation might miss this because it only sees import * as NS
-  
-  // Find if any external consumer is from namespace-consumer.ts
+
+
+
+
+
+
   let foundNamespaceConsumer = false;
   for (const consumerUuid of externalConsumers) {
     const consumerNode = indexer.project.get(consumerUuid);
@@ -79,7 +79,7 @@ async function testNamespacePropertyAccess() {
       break;
     }
   }
-  
+
   if (!foundNamespaceConsumer) {
     reportBug(
       'Namespace property access not fully tracked',
@@ -92,39 +92,39 @@ async function testNamespacePropertyAccess() {
   }
 }
 
-// ============================================================================
-// BUG TEST 2: Re-export with rename chain tracking
-// ============================================================================
+
+
+
 async function testRenameChainTracking() {
   console.log('\n🔍 BUG TEST: Re-export rename chain tracking');
-  
+
   const indexer = await runIndexer(FIXTURES_PATH);
   const tracer = new DependencyTracer(indexer);
-  
-  // Find deeplyNested from re-export-chain.ts
+
+
   let deeplyNestedDecl = null;
   for (const [uuid, node] of indexer.declarations) {
-    if ((node.declaredNames || []).includes('deeplyNested') && 
+    if ((node.declaredNames || []).includes('deeplyNested') &&
         node.filePath?.includes('re-export-chain.ts')) {
       deeplyNestedDecl = { uuid, node };
       break;
     }
   }
-  
+
   if (!deeplyNestedDecl) {
     reportBug('Rename chain test setup', 'deeplyNested found', 'not found');
     return;
   }
-  
+
   const traced = tracer.traceAll();
   const tracedDeep = traced.get(deeplyNestedDecl.uuid);
   const externalConsumers = Object.keys(tracedDeep?.dependant?.external || {});
-  
-  // Track the path:
-  // re-export-chain.ts (deeplyNested) -> reexport-level1.ts (deeplyNested) 
-  //   -> reexport-level2.ts (renamedDeep) -> deep-consumer.ts
-  
-  // Check that the final consumer (deep-consumer.ts) is found
+
+
+
+
+
+
   let foundDeepConsumer = false;
   for (const consumerUuid of externalConsumers) {
     const consumerNode = indexer.project.get(consumerUuid);
@@ -133,7 +133,7 @@ async function testRenameChainTracking() {
       break;
     }
   }
-  
+
   if (!foundDeepConsumer) {
     reportBug(
       'Rename chain not fully tracked',
@@ -146,36 +146,36 @@ async function testRenameChainTracking() {
   }
 }
 
-// ============================================================================
-// BUG TEST 3: export * from barrel file tracking
-// ============================================================================
+
+
+
 async function testExportStarTracking() {
   console.log('\n🔍 BUG TEST: export * barrel file tracking');
-  
+
   const indexer = await runIndexer(FIXTURES_PATH);
   const tracer = new DependencyTracer(indexer);
-  
-  // Find starExport1 from export-star.ts
+
+
   let starExport1Decl = null;
   for (const [uuid, node] of indexer.declarations) {
-    if ((node.declaredNames || []).includes('starExport1') && 
+    if ((node.declaredNames || []).includes('starExport1') &&
         node.filePath?.includes('export-star.ts')) {
       starExport1Decl = { uuid, node };
       break;
     }
   }
-  
+
   if (!starExport1Decl) {
     reportBug('Export star test setup', 'starExport1 found', 'not found');
     return;
   }
-  
+
   const traced = tracer.traceAll();
   const tracedStar = traced.get(starExport1Decl.uuid);
   const externalConsumers = Object.keys(tracedStar?.dependant?.external || {});
-  
-  // Path: export-star.ts -> barrel-file.ts (export *) -> barrel-consumer.ts
-  
+
+
+
   let foundBarrelConsumer = false;
   for (const consumerUuid of externalConsumers) {
     const consumerNode = indexer.project.get(consumerUuid);
@@ -184,7 +184,7 @@ async function testExportStarTracking() {
       break;
     }
   }
-  
+
   if (!foundBarrelConsumer) {
     reportBug(
       'export * not tracking through to final consumer',
@@ -197,16 +197,16 @@ async function testExportStarTracking() {
   }
 }
 
-// ============================================================================
-// BUG TEST 4: Default export imported with different name
-// ============================================================================
+
+
+
 async function testDefaultImportRename() {
   console.log('\n🔍 BUG TEST: Default export imported with different name');
-  
+
   const indexer = await runIndexer(FIXTURES_PATH);
   const tracer = new DependencyTracer(indexer);
-  
-  // Find DeepFunction (exported as default) from re-export-chain.ts  
+
+
   let deepFuncDecl = null;
   for (const [uuid, node] of indexer.exports) {
     if (node.filePath?.includes('re-export-chain.ts') && node.isDefaultExport) {
@@ -214,20 +214,20 @@ async function testDefaultImportRename() {
       break;
     }
   }
-  
+
   if (!deepFuncDecl) {
     reportBug('Default import rename test setup', 'DeepFunction default export found', 'not found');
     return;
   }
-  
+
   const traced = tracer.traceAll();
   const tracedFunc = traced.get(deepFuncDecl.uuid);
-  
+
   if (!tracedFunc) {
-    // Default exports that are also declarations should be in traced
+
     console.log('   ⚠️  Default export may not be in declarations map');
-    
-    // Try to find via declared name
+
+
     for (const [uuid, node] of indexer.declarations) {
       if ((node.declaredNames || []).includes('DeepFunction')) {
         const tracedAlt = traced.get(uuid);
@@ -239,14 +239,14 @@ async function testDefaultImportRename() {
     reportPass('Default export tracking needs verification');
     return;
   }
-  
+
   const externalConsumers = Object.keys(tracedFunc?.dependant?.external || {});
-  
-  // Path: re-export-chain.ts (default DeepFunction) 
-  //   -> reexport-level1.ts (default as DeepFunction)
-  //   -> reexport-level2.ts (DeepFunction as RenamedDeepFunc)
-  //   -> deep-consumer.ts (RenamedDeepFunc)
-  
+
+
+
+
+
+
   let foundConsumer = false;
   for (const consumerUuid of externalConsumers) {
     const consumerNode = indexer.project.get(consumerUuid);
@@ -255,7 +255,7 @@ async function testDefaultImportRename() {
       break;
     }
   }
-  
+
   if (!foundConsumer) {
     reportBug(
       'Default export rename chain not tracked',
@@ -268,40 +268,40 @@ async function testDefaultImportRename() {
   }
 }
 
-// ============================================================================
-// BUG TEST 5: Shadowing over-detection
-// ============================================================================
+
+
+
 async function testShadowingOverDetection() {
   console.log('\n🔍 BUG TEST: Variable shadowing over-detection');
-  
+
   const indexer = await runIndexer(FIXTURES_PATH);
   const tracer = new DependencyTracer(indexer);
-  
-  // Find 'shadowed' export from shadowing.ts
+
+
   let shadowedDecl = null;
   for (const [uuid, node] of indexer.declarations) {
-    if ((node.declaredNames || []).includes('shadowed') && 
+    if ((node.declaredNames || []).includes('shadowed') &&
         node.filePath?.includes('shadowing.ts') &&
         node.isExported) {
       shadowedDecl = { uuid, node };
       break;
     }
   }
-  
+
   if (!shadowedDecl) {
     reportBug('Shadowing test setup', 'shadowed export found', 'not found');
     return;
   }
-  
+
   const traced = tracer.traceAll();
   const tracedShadowed = traced.get(shadowedDecl.uuid);
   const internalConsumers = tracedShadowed?.dependant?.internal?.length || 0;
-  
-  // Only actualConsumer should use the exported 'shadowed'
-  // consumer and consumer2 shadow it locally
-  // Expected: 1 (just actualConsumer)
-  // Actual with regex: likely 3 (all functions mention 'shadowed')
-  
+
+
+
+
+
+
   if (internalConsumers > 1) {
     reportBug(
       'Shadowing causes false positive usage detection',
@@ -314,16 +314,16 @@ async function testShadowingOverDetection() {
   }
 }
 
-// ============================================================================
-// BUG TEST 6: String/comment false positives
-// ============================================================================
+
+
+
 async function testStringCommentFalsePositives() {
   console.log('\n🔍 BUG TEST: String and comment false positives');
-  
+
   const indexer = await runIndexer(FIXTURES_PATH);
   const tracer = new DependencyTracer(indexer);
-  
-  // Test the raw regex-stripping logic
+
+
   const testCases = [
     {
       name: 'identifier in single-quoted string',
@@ -371,31 +371,31 @@ async function testStringCommentFalsePositives() {
       name: 'identifier as object key (shorthand)',
       code: `const obj = { targetSymbol };`,
       identifier: 'targetSymbol',
-      shouldMatch: true, // This IS a usage of the variable
+      shouldMatch: true,
     },
     {
       name: 'identifier as object key (property name only)',
       code: `const obj = { targetSymbol: "value" };`,
       identifier: 'targetSymbol',
-      shouldMatch: false, // This is NOT a usage if only as key
-      // Actually, with regex matching, this will match. Bug potential!
+      shouldMatch: false,
+
     },
     {
       name: 'identifier in regex literal',
       code: `const re = /targetSymbol/;`,
       identifier: 'targetSymbol',
-      shouldMatch: false, // Debatable, but regex patterns shouldn't count
+      shouldMatch: false,
     },
     {
       name: 'escaped quote in string',
       code: `const s = "He said \\"targetSymbol\\" here"; const x = targetSymbol;`,
       identifier: 'targetSymbol',
-      shouldMatch: true, // The second one is real usage
+      shouldMatch: true,
     },
   ];
-  
+
   let failures = 0;
-  
+
   for (const tc of testCases) {
     const result = tracer.isIdentifierUsedInCode(tc.code, tc.identifier);
     if (result !== tc.shouldMatch) {
@@ -403,7 +403,7 @@ async function testStringCommentFalsePositives() {
       console.log(`   ❌ ${tc.name}: expected ${tc.shouldMatch}, got ${result}`);
     }
   }
-  
+
   if (failures > 0) {
     reportBug(
       'String/comment stripping has edge cases',
@@ -416,37 +416,37 @@ async function testStringCommentFalsePositives() {
   }
 }
 
-// ============================================================================
-// BUG TEST 7: TypeScript type-only usage
-// ============================================================================
+
+
+
 async function testTypeOnlyUsage() {
   console.log('\n🔍 BUG TEST: TypeScript type-only usage tracking');
-  
+
   const indexer = await runIndexer(FIXTURES_PATH);
   const tracer = new DependencyTracer(indexer);
-  
-  // Find MyInterface from type-only-import.ts
+
+
   let interfaceDecl = null;
   for (const [uuid, node] of indexer.declarations) {
-    if ((node.declaredNames || []).includes('MyInterface') && 
+    if ((node.declaredNames || []).includes('MyInterface') &&
         node.filePath?.includes('type-only-import.ts')) {
       interfaceDecl = { uuid, node };
       break;
     }
   }
-  
+
   if (!interfaceDecl) {
     reportBug('Type-only test setup', 'MyInterface found', 'not found');
     return;
   }
-  
+
   const traced = tracer.traceAll();
   const tracedInterface = traced.get(interfaceDecl.uuid);
   const externalConsumers = Object.keys(tracedInterface?.dependant?.external || {});
-  
-  // type-consumer.ts uses MyInterface in type annotations
-  // import type { MyInterface } from './type-only-import'
-  
+
+
+
+
   let foundConsumer = false;
   for (const consumerUuid of externalConsumers) {
     const consumerNode = indexer.project.get(consumerUuid);
@@ -455,8 +455,8 @@ async function testTypeOnlyUsage() {
       break;
     }
   }
-  
-  // Note: Type-only imports might not be tracked as "usage" depending on implementation
+
+
   if (!foundConsumer) {
     reportBug(
       'Type-only imports may not be tracked',
@@ -469,23 +469,23 @@ async function testTypeOnlyUsage() {
   }
 }
 
-// ============================================================================
-// BUG TEST 8: Mixed default and named imports from same statement
-// ============================================================================
+
+
+
 async function testMixedImportStatement() {
   console.log('\n🔍 BUG TEST: Mixed default and named imports');
-  
+
   const indexer = await runIndexer(FIXTURES_PATH);
-  
-  // Check that default-and-named.ts has both default and named exports indexed
+
+
   let hasDefault = false;
   let hasNamed1 = false;
   let hasNamed2 = false;
   let hasMainComponentNamed = false;
-  
+
   for (const [uuid, node] of indexer.exports) {
     if (!node.filePath?.includes('default-and-named.ts')) continue;
-    
+
     for (const exp of node.exportedNames || []) {
       if (exp.exported === 'default') hasDefault = true;
       if (exp.exported === 'namedExport1') hasNamed1 = true;
@@ -493,7 +493,7 @@ async function testMixedImportStatement() {
       if (exp.exported === 'MainComponent' && exp.local === 'MainComponent') hasMainComponentNamed = true;
     }
   }
-  
+
   if (!hasDefault || !hasNamed1 || !hasNamed2) {
     reportBug(
       'Mixed exports not all indexed',
@@ -506,27 +506,27 @@ async function testMixedImportStatement() {
   }
 }
 
-// ============================================================================
-// BUG TEST 9: Destructuring export names
-// ============================================================================
+
+
+
 async function testDestructuringExportNames() {
   console.log('\n🔍 BUG TEST: Destructuring export variable names');
-  
+
   const indexer = await runIndexer(FIXTURES_PATH);
-  
-  // Check that destructuring.ts exports are properly named
+
+
   const expectedNames = ['extractedA', 'renamedB', 'first', 'second', 'rest', 'deepValue', 'withDefault'];
   const foundNames = new Set();
-  
+
   for (const [uuid, node] of indexer.declarations) {
     if (!node.filePath?.includes('destructuring.ts')) continue;
     for (const name of node.declaredNames || []) {
       foundNames.add(name);
     }
   }
-  
+
   const missing = expectedNames.filter(n => !foundNames.has(n));
-  
+
   if (missing.length > 0) {
     reportBug(
       'Destructuring export names not all captured',
@@ -539,16 +539,16 @@ async function testDestructuringExportNames() {
   }
 }
 
-// ============================================================================
-// BUG TEST 10: Identifier substring false positive
-// ============================================================================
+
+
+
 async function testIdentifierSubstring() {
   console.log('\n🔍 BUG TEST: Identifier substring matching');
-  
+
   const indexer = await runIndexer(FIXTURES_PATH);
   const tracer = new DependencyTracer(indexer);
-  
-  // Test that 'alpha' doesn't match 'alphaNumeric' or 'betaAlpha'
+
+
   const testCases = [
     {
       code: 'const alphaNumeric = 1;',
@@ -573,15 +573,15 @@ async function testIdentifierSubstring() {
     {
       code: 'console.log(_alpha);',
       identifier: 'alpha',
-      shouldMatch: false, // _alpha is different
+      shouldMatch: false,
     },
     {
       code: 'console.log(alpha_);',
       identifier: 'alpha',
-      shouldMatch: false, // alpha_ is different
+      shouldMatch: false,
     },
   ];
-  
+
   let failures = 0;
   for (const tc of testCases) {
     const result = tracer.isIdentifierUsedInCode(tc.code, tc.identifier);
@@ -590,7 +590,7 @@ async function testIdentifierSubstring() {
       console.log(`   ❌ "${tc.code}" for "${tc.identifier}": expected ${tc.shouldMatch}, got ${result}`);
     }
   }
-  
+
   if (failures > 0) {
     reportBug(
       'Identifier word boundary matching issues',
@@ -603,15 +603,15 @@ async function testIdentifierSubstring() {
   }
 }
 
-// ============================================================================
-// RUN ALL BUG TESTS
-// ============================================================================
+
+
+
 
 async function runBugTests() {
   console.log('🐛 Atomizer Bug-Finding Test Suite');
   console.log('='.repeat(60));
   console.log('These tests aim to find edge cases and bugs\n');
-  
+
   try {
     await testNamespacePropertyAccess();
     await testRenameChainTracking();
@@ -627,10 +627,10 @@ async function runBugTests() {
     console.error('\n💥 Test crashed:', e.message);
     console.error(e.stack);
   }
-  
+
   console.log('\n' + '='.repeat(60));
   console.log(`📊 Results: ${passed} passed, ${failed} bugs found`);
-  
+
   if (bugs.length > 0) {
     console.log('\n🐛 BUGS SUMMARY:');
     for (const bug of bugs) {
@@ -640,7 +640,7 @@ async function runBugTests() {
       if (bug.details) console.log(`   Note: ${bug.details}`);
     }
   }
-  
+
   process.exit(bugs.length > 0 ? 1 : 0);
 }
 

@@ -22,13 +22,13 @@ class FileSplitter {
     for (const file of filesToSplit) {
       const result = this.splitFile(file, updatedPaths);
       splitOperations.push(...result.operations);
-      
-      // Update paths map with new split files
+
+
       for (const [exportName, newPath] of result.newPaths) {
         updatedPaths.set(`${file.filePath}#${exportName}`, newPath);
       }
-      
-      // Track import rewrites needed
+
+
       importRewrites.set(file.filePath, result.importRewrites);
     }
 
@@ -42,12 +42,12 @@ class FileSplitter {
     const content = fs.readFileSync(file.filePath, 'utf-8');
     const ext = file.extension;
     const fileDir = path.dirname(existingPaths.get(file.filePath) || file.filePath);
-    
+
     const operations = [];
     const newPaths = new Map();
     const importRewrites = {};
 
-    // Parse the file to get detailed AST
+
     const ast = parse(content, {
       jsx: ext === '.tsx' || ext === '.jsx',
       loc: true,
@@ -56,21 +56,21 @@ class FileSplitter {
       comment: true,
     });
 
-    // Collect all top-level declarations and their dependencies
+
     const declarations = this.collectDeclarations(ast, content);
     const imports = this.collectImports(ast, content);
-    
-    // Group exports by type
+
+
     const hooksToSplit = file.exportedHooks || [];
     const componentsToSplit = file.exportedComponents || [];
     const allToSplit = [...hooksToSplit, ...componentsToSplit];
 
-    // Determine what stays in the original file (shared code)
-    const sharedExports = file.exports.filter(e => 
+
+    const sharedExports = file.exports.filter(e =>
       !e.isHook && !e.isComponent
     );
 
-    // First pass: determine new file paths for all exports
+
     const exportPaths = new Map();
     for (const exp of allToSplit) {
       const isComponent = exp.isComponent;
@@ -84,21 +84,21 @@ class FileSplitter {
       newPaths.set(exp.name, newFilePath);
     }
 
-    // Second pass: create files with proper imports to sibling exports
+
     for (const exp of allToSplit) {
       const decl = declarations.get(exp.name);
       if (!decl) continue;
 
       const newFilePath = exportPaths.get(exp.name);
 
-      // Find dependencies this export needs (including other split exports)
+
       const deps = this.findDependencies(exp.name, declarations, content);
-      
-      // Find which split exports this one depends on
+
+
       const siblingDeps = [];
       for (const siblingExp of allToSplit) {
         if (siblingExp.name === exp.name) continue;
-        // Use the smarter identifier check that ignores strings
+
         if (this.isIdentifierUsed(decl.code, siblingExp.name)) {
           siblingDeps.push({
             name: siblingExp.name,
@@ -107,7 +107,7 @@ class FileSplitter {
         }
       }
 
-      // Build the new file content
+
       const newContent = this.buildNewFileContent({
         exportName: exp.name,
         declaration: decl,
@@ -129,8 +129,8 @@ class FileSplitter {
         exportName: exp.name,
         originalFile: file.filePath,
       });
-      
-      // Track how imports should be rewritten
+
+
       importRewrites[exp.name] = {
         oldPath: file.filePath,
         newPath: newFilePath,
@@ -138,9 +138,9 @@ class FileSplitter {
       };
     }
 
-    // Handle the original file - either delete it or keep shared exports
+
     if (sharedExports.length > 0) {
-      // Keep the file but remove the split exports
+
       const remainingContent = this.buildRemainingContent({
         originalContent: content,
         ast,
@@ -154,7 +154,7 @@ class FileSplitter {
         content: remainingContent,
       });
     } else {
-      // Delete the original file - it's now empty
+
       operations.push({
         type: 'delete',
         filePath: file.filePath,
@@ -226,7 +226,7 @@ class FileSplitter {
         });
       }
 
-      // Handle exported declarations
+
       if (node.type === 'ExportNamedDeclaration' && node.declaration) {
         const decl = node.declaration;
         if (decl.type === 'FunctionDeclaration' && decl.id?.name) {
@@ -297,7 +297,7 @@ class FileSplitter {
         }
       }
 
-      // Handle default exports
+
       if (node.type === 'ExportDefaultDeclaration') {
         const decl = node.declaration;
         if (decl.type === 'FunctionDeclaration' && decl.id?.name) {
@@ -314,7 +314,7 @@ class FileSplitter {
             isDefault: true,
           });
         } else if (decl.type === 'Identifier') {
-          // export default SomeIdentifier - link to existing declaration
+
           const existing = declarations.get(decl.name);
           if (existing) {
             existing.isDefault = true;
@@ -359,14 +359,14 @@ class FileSplitter {
     const decl = declarations.get(exportName);
     if (!decl) return deps;
 
-    // Get the code for this declaration
+
     const code = decl.code || '';
-    
-    // Check what other declarations are referenced
+
+
     for (const [name, otherDecl] of declarations) {
       if (name === exportName) continue;
-      
-      // Check if the identifier is used outside of strings
+
+
       if (this.isIdentifierUsed(code, name)) {
         deps.add(name);
       }
@@ -379,14 +379,14 @@ class FileSplitter {
    * Check if an identifier is actually used in code (not just in strings)
    */
   isIdentifierUsed(code, identifier) {
-    // Remove string literals and comments to avoid false positives
+
     const codeWithoutStrings = code
-      .replace(/`[^`]*`/g, '""')  // template literals
-      .replace(/'[^']*'/g, '""')  // single quoted strings
-      .replace(/"[^"]*"/g, '""')  // double quoted strings  
-      .replace(/\/\/.*$/gm, '')   // single line comments
-      .replace(/\/\*[\s\S]*?\*\//g, ''); // multi-line comments
-    
+      .replace(/`[^`]*`/g, '""')
+      .replace(/'[^']*'/g, '""')
+      .replace(/"[^"]*"/g, '""')
+      .replace(/\/\/.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+
     const regex = new RegExp(`\\b${identifier}\\b`);
     return regex.test(codeWithoutStrings);
   }
@@ -397,20 +397,20 @@ class FileSplitter {
   buildNewFileContent({ exportName, declaration, dependencies, imports, sharedExports, siblingDeps, newFilePath, originalFile, originalContent, isDefault, fileDir }) {
     const lines = [];
     const newFileDir = path.dirname(newFilePath);
-    
-    // Determine which imports are needed
+
+
     const neededImports = this.filterImports(imports, declaration.code, dependencies);
-    
-    // Add imports
+
+
     for (const imp of neededImports) {
       lines.push(imp.code);
     }
 
-    // Add imports for sibling exports (other hooks/components from same file)
+
     for (const sibling of siblingDeps || []) {
-      // Calculate relative path from new file to sibling file
+
       let relativePath = path.relative(newFileDir, sibling.path);
-      // Remove extension and /index suffix
+
       relativePath = relativePath.replace(/\.(tsx?|jsx?)$/, '').replace(/\/index$/, '');
       if (!relativePath.startsWith('.')) {
         relativePath = './' + relativePath;
@@ -418,16 +418,16 @@ class FileSplitter {
       lines.push(`import { ${sibling.name} } from '${relativePath}';`);
     }
 
-    // If there are shared exports in the original file that this export uses,
-    // add an import for them
+
+
     const usedShared = sharedExports.filter(e => {
       const regex = new RegExp(`\\b${e.name}\\b`);
       return regex.test(declaration.code);
     });
 
     if (usedShared.length > 0) {
-      // Calculate relative import path from new file to original file's new location
-      // The original file will become fileDir/originalFile.name/index.ext or stay as fileDir/originalFile.name.ext
+
+
       const originalNewPath = path.join(fileDir, 'index' + originalFile.extension);
       let relativePath = path.relative(newFileDir, path.dirname(originalNewPath));
       if (!relativePath || relativePath === '') {
@@ -443,9 +443,9 @@ class FileSplitter {
       lines.push('');
     }
 
-    // Add the main declaration
+
     if (declaration.isExported) {
-      // Already has export keyword
+
       lines.push(declaration.exportCode);
     } else if (isDefault) {
       lines.push(declaration.code);
@@ -464,7 +464,7 @@ class FileSplitter {
     const needed = [];
 
     for (const imp of imports) {
-      // Check if any specifier is used in the code
+
       const usedSpecifiers = imp.specifiers.filter(s => {
         const regex = new RegExp(`\\b${s.local}\\b`);
         return regex.test(code);
@@ -472,13 +472,13 @@ class FileSplitter {
 
       if (usedSpecifiers.length > 0) {
         if (usedSpecifiers.length === imp.specifiers.length) {
-          // All specifiers used, keep entire import
+
           needed.push(imp);
         } else {
-          // Rebuild import with only used specifiers
+
           const defaultSpec = usedSpecifiers.find(s => s.type === 'ImportDefaultSpecifier');
           const namedSpecs = usedSpecifiers.filter(s => s.type === 'ImportSpecifier');
-          
+
           let importLine = 'import ';
           if (defaultSpec) {
             importLine += defaultSpec.local;
@@ -487,12 +487,12 @@ class FileSplitter {
             }
           }
           if (namedSpecs.length > 0) {
-            importLine += '{ ' + namedSpecs.map(s => 
+            importLine += '{ ' + namedSpecs.map(s =>
               s.imported === s.local ? s.local : `${s.imported} as ${s.local}`
             ).join(', ') + ' }';
           }
           importLine += ` from '${imp.source}';`;
-          
+
           needed.push({ ...imp, code: importLine });
         }
       }
@@ -505,25 +505,25 @@ class FileSplitter {
    * Build content for the original file after splitting (remaining shared exports)
    */
   buildRemainingContent({ originalContent, ast, removedExports, imports }) {
-    // For now, we'll rebuild the file without the removed exports
-    // This is a simplified approach - a more robust solution would use
-    // source code manipulation
-    
+
+
+
+
     const lines = [];
     const removedSet = new Set(removedExports);
-    
-    // Keep all imports
+
+
     for (const imp of imports) {
       lines.push(imp.code);
     }
-    
+
     if (imports.length > 0) {
       lines.push('');
     }
 
-    // Process each top-level statement
+
     for (const node of ast.body) {
-      if (node.type === 'ImportDeclaration') continue; // Already handled
+      if (node.type === 'ImportDeclaration') continue;
 
       let shouldKeep = true;
       let exportName = null;
@@ -569,10 +569,10 @@ class FileSplitter {
   async execute(splitOperations, outputPath) {
     for (const op of splitOperations) {
       if (op.type === 'create' || op.type === 'update') {
-        // Map path to output directory if provided
+
         const targetPath = outputPath ? op.filePath.replace(this.srcPath, outputPath) : op.filePath;
-        
-        // Ensure directory exists
+
+
         const dir = path.dirname(targetPath);
         if (!fs.existsSync(dir)) {
           fs.mkdirSync(dir, { recursive: true });
@@ -580,7 +580,7 @@ class FileSplitter {
         fs.writeFileSync(targetPath, op.content, 'utf-8');
         console.log(`  ${op.type === 'create' ? 'Created' : 'Updated'}: ${path.relative(outputPath || this.srcPath, targetPath)}`);
       }
-      // Skip 'delete' operations as we are copying, not moving
+
     }
   }
 }

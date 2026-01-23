@@ -17,14 +17,14 @@ class SymbolTracer {
   trace(filePath) {
     const file = this.fileMap.get(filePath);
     if (!file) {
-      // If not in analysis results, we might need to analyze it first
-      // For now, let's assume it's there
+
+
       throw new Error(`File not found in analysis: ${filePath}`);
     }
 
     const content = fs.readFileSync(filePath, 'utf-8');
     const ext = path.extname(filePath);
-    
+
     let ast;
     try {
       ast = parse(content, {
@@ -38,15 +38,15 @@ class SymbolTracer {
       throw new Error(`Failed to parse ${filePath}: ${e.message}`);
     }
 
-    // 1. Collect all top-level declarations
+
     const symbols = this.collectTopLevelSymbols(ast, content);
 
-    // 2. Find internal consumers for each symbol
+
     for (const symbol of symbols) {
       symbol.internalConsumers = this.findInternalConsumers(symbol, symbols, content);
     }
 
-    // 3. Find external consumers for each symbol
+
     for (const symbol of symbols) {
       if (symbol.isExported) {
         symbol.externalConsumers = this.findExternalConsumers(symbol, filePath);
@@ -61,7 +61,7 @@ class SymbolTracer {
   collectTopLevelSymbols(ast, content) {
     const symbols = [];
 
-    // First pass: collect all declarations
+
     for (const node of ast.body) {
       let decl = node;
       let isExported = false;
@@ -150,13 +150,13 @@ class SymbolTracer {
       }
     }
 
-    // Second pass: handle re-exports and CommonJS exports
+
     for (const node of ast.body) {
       if (node.type === 'ExportNamedDeclaration' && node.specifiers) {
         for (const spec of node.specifiers) {
           const localName = spec.local?.name;
           const exportedName = spec.exported?.name || localName;
-          
+
           const symbol = symbols.find(s => s.name === localName);
           if (symbol) {
             symbol.isExported = true;
@@ -175,12 +175,12 @@ class SymbolTracer {
 
       if (node.type === 'ExpressionStatement' && node.expression.type === 'AssignmentExpression') {
         const { left, right } = node.expression;
-        
-        // module.exports = ...
-        if (left.type === 'MemberExpression' && 
-            left.object.name === 'module' && 
+
+
+        if (left.type === 'MemberExpression' &&
+            left.object.name === 'module' &&
             left.property.name === 'exports') {
-          
+
           if (right.type === 'Identifier') {
             const symbol = symbols.find(s => s.name === right.name);
             if (symbol) {
@@ -198,9 +198,9 @@ class SymbolTracer {
             }
           }
         }
-        
-        // exports.foo = ...
-        if (left.type === 'MemberExpression' && 
+
+
+        if (left.type === 'MemberExpression' &&
             left.object.name === 'exports') {
           if (right.type === 'Identifier') {
             const symbol = symbols.find(s => s.name === right.name);
@@ -220,7 +220,7 @@ class SymbolTracer {
     const name = symbol.name;
     if (name === 'default') return [];
 
-    // Check other symbols
+
     for (const other of allSymbols) {
       if (other === symbol) continue;
       if (!other.code) continue;
@@ -230,13 +230,13 @@ class SymbolTracer {
       }
     }
 
-    // Check for top-level usages (outside of any symbol)
-    // We'll do this by removing all symbol code from the content and checking what's left
+
+
     let remainingCode = content;
-    
-    // Sort symbols by range descending to avoid offset issues when removing
+
+
     const sortedSymbols = [...allSymbols].sort((a, b) => b.range[0] - a.range[0]);
-    
+
     for (const s of sortedSymbols) {
       if (s.range) {
         remainingCode = remainingCode.slice(0, s.range[0]) + ' '.repeat(s.range[1] - s.range[0]) + remainingCode.slice(s.range[1]);
@@ -269,8 +269,8 @@ class SymbolTracer {
               return spec.imported === name || spec.local === name;
             });
           } else if (imp.isRequire || imp.isDynamic) {
-            // For require() or dynamic import(), we assume it consumes the default export
-            // or the whole module if it's a CommonJS module.
+
+
             if (symbol.isDefault) {
               isImported = true;
             }
@@ -294,7 +294,7 @@ class SymbolTracer {
       .replace(/"[^"]*"/g, '""')
       .replace(/\/\/.*$/gm, '')
       .replace(/\/\*[\s\S]*?\*\//g, '');
-    
+
     const regex = new RegExp(`\\b${identifier}\\b`);
     return regex.test(codeWithoutStrings);
   }

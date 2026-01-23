@@ -21,7 +21,7 @@ program
     try {
       const atomizer = new Atomizer(srcPath, options);
       const result = await atomizer.analyze();
-      
+
       if (options.json) {
         console.log(JSON.stringify(result, null, 2));
       } else {
@@ -43,7 +43,7 @@ program
     try {
       const atomizer = new Atomizer(srcPath, options);
       const result = await atomizer.index();
-      
+
       if (options.json) {
         console.log(JSON.stringify(result.indexer.toJSON(), null, 2));
       } else {
@@ -68,7 +68,7 @@ program
     try {
       const atomizer = new Atomizer(srcPath, options);
       const result = await atomizer.traceAllDependencies();
-      
+
       if (options.json) {
         console.log(JSON.stringify(result.tracer.toJSON(), null, 2));
       } else {
@@ -94,12 +94,12 @@ program
     try {
       const resolvedSrcPath = path.resolve(srcPath);
       const atomizer = new Atomizer(resolvedSrcPath, options);
-      
-      // Use the traced dependency data flow
+
+
       const traceResult = await atomizer.traceAllDependencies();
-      
+
       if (options.dryRun) {
-        // Show what the migration would do
+
         atomizer.printDependencyTrace(traceResult);
         console.log(chalk.yellow('\n[DRY RUN] No files were modified.'));
       } else {

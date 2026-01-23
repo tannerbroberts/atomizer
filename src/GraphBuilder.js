@@ -2,8 +2,8 @@ class Graph {
   constructor(name) {
     this.name = name;
     this.nodes = new Map();
-    this.edges = new Map(); // nodeId -> Set of target nodeIds
-    this.reverseEdges = new Map(); // nodeId -> Set of source nodeIds
+    this.edges = new Map();
+    this.reverseEdges = new Map();
   }
 
   addNode(id, data) {
@@ -23,7 +23,7 @@ class Graph {
     if (!this.reverseEdges.has(to)) {
       this.reverseEdges.set(to, new Set());
     }
-    
+
     this.edges.get(from).add(to);
     this.reverseEdges.get(to).add(from);
   }
@@ -74,7 +74,7 @@ class Graph {
     return count;
   }
 
-  // Detect cycles (for DAG validation)
+
   hasCycle() {
     const visited = new Set();
     const recursionStack = new Set();
@@ -105,7 +105,7 @@ class Graph {
     return false;
   }
 
-  // Topological sort (for execution order)
+
   topologicalSort() {
     const visited = new Set();
     const result = [];
@@ -129,7 +129,7 @@ class Graph {
     return result;
   }
 
-  // Find all ancestors of a node
+
   getAncestors(nodeId) {
     const ancestors = new Set();
     const queue = [...(this.reverseEdges.get(nodeId) || [])];
@@ -148,7 +148,7 @@ class Graph {
     return ancestors;
   }
 
-  // Find all descendants of a node
+
   getDescendants(nodeId) {
     const descendants = new Set();
     const queue = [...(this.edges.get(nodeId) || [])];
@@ -172,8 +172,8 @@ class GraphBuilder {
   constructor(analysisResults) {
     this.files = analysisResults;
     this.fileMap = new Map();
-    
-    // Build a map from file path to file info
+
+
     for (const file of analysisResults) {
       this.fileMap.set(file.filePath, file);
     }
@@ -190,7 +190,7 @@ class GraphBuilder {
     const tree = new Graph('RenderTree');
     const components = this.files.filter(f => f.classification === 'component');
 
-    // Add all components as nodes
+
     for (const comp of components) {
       tree.addNode(comp.filePath, {
         name: comp.name,
@@ -199,22 +199,22 @@ class GraphBuilder {
       });
     }
 
-    // Build import name -> file path mapping
+
     const importNameToFile = this.buildImportNameMap(components);
 
-    // Add edges based on JSX element usage
+
     for (const comp of components) {
       for (const jsx of comp.jsxElements) {
-        // Find which import this JSX element corresponds to
+
         const importedFrom = this.resolveJSXToImport(comp, jsx.name, importNameToFile);
-        
+
         if (importedFrom && tree.nodes.has(importedFrom)) {
           tree.addEdge(comp.filePath, importedFrom);
         }
       }
     }
 
-    // Validate DAG constraint
+
     if (tree.hasCycle()) {
       console.warn('Warning: Render tree has cycles, which may indicate circular component rendering');
     }
@@ -226,10 +226,10 @@ class GraphBuilder {
     const map = new Map();
 
     for (const comp of components) {
-      // Map component name to file path
+
       map.set(comp.name, comp.filePath);
-      
-      // Also map exported names
+
+
       for (const exp of comp.exports) {
         if (exp.name && exp.name !== 'default') {
           map.set(exp.name, comp.filePath);
@@ -241,13 +241,13 @@ class GraphBuilder {
   }
 
   resolveJSXToImport(file, jsxName, importNameToFile) {
-    // Check if the JSX name matches an import
+
     for (const imp of file.imports) {
       for (const spec of imp.specifiers) {
         if (spec.local === jsxName || spec.imported === jsxName) {
-          // Return the resolved path if it's a local component
+
           if (imp.resolvedPath && this.fileMap.has(imp.resolvedPath)) {
-            // Check if this resolves to a barrel file - if so, follow the re-export
+
             const resolvedFile = this.fileMap.get(imp.resolvedPath);
             if (resolvedFile?.classification === 'barrel') {
               const actualPath = this.followBarrelReexport(resolvedFile, jsxName);
@@ -257,8 +257,8 @@ class GraphBuilder {
           }
         }
       }
-      
-      // Handle default imports
+
+
       if (imp.specifiers.some(s => s.type === 'ImportDefaultSpecifier' && s.local === jsxName)) {
         if (imp.resolvedPath && this.fileMap.has(imp.resolvedPath)) {
           const resolvedFile = this.fileMap.get(imp.resolvedPath);
@@ -271,7 +271,7 @@ class GraphBuilder {
       }
     }
 
-    // Fallback to name-based matching
+
     return importNameToFile.get(jsxName) || null;
   }
 
@@ -283,30 +283,30 @@ class GraphBuilder {
     visited.add(barrelFile.filePath);
 
     for (const imp of barrelFile.imports) {
-      // Check if this import re-exports the name we're looking for
-      const hasName = imp.specifiers.some(s => 
+
+      const hasName = imp.specifiers.some(s =>
         s.local === exportName || s.imported === exportName
       );
-      
-      // Also check for `export * from` which may include our name
+
+
       const isWildcard = imp.isReexport && imp.specifiers.length === 0;
-      
+
       if (hasName || isWildcard) {
         if (imp.resolvedPath && this.fileMap.has(imp.resolvedPath)) {
           const targetFile = this.fileMap.get(imp.resolvedPath);
-          
-          // If target is a component, we found it
+
+
           if (targetFile.classification === 'component') {
             return imp.resolvedPath;
           }
-          
-          // If target is another barrel, recurse
+
+
           if (targetFile.classification === 'barrel') {
             const result = this.followBarrelReexport(targetFile, exportName, visited);
             if (result) return result;
           }
-          
-          // Otherwise return the resolved path
+
+
           return imp.resolvedPath;
         }
       }
@@ -318,7 +318,7 @@ class GraphBuilder {
   buildDependencyGraph() {
     const graph = new Graph('DependencyGraph');
 
-    // Add all files as nodes
+
     for (const file of this.files) {
       graph.addNode(file.filePath, {
         name: file.name,
@@ -327,7 +327,7 @@ class GraphBuilder {
       });
     }
 
-    // Add edges based on imports
+
     for (const file of this.files) {
       for (const imp of file.imports) {
         if (imp.resolvedPath && this.fileMap.has(imp.resolvedPath)) {

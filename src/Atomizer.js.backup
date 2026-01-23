@@ -35,17 +35,17 @@ class Atomizer {
     console.log(chalk.blue('📦 Starting Atomizer indexing (Phase 1)...'));
     console.log(chalk.gray(`   Source: ${this.srcPath}\n`));
 
-
+    // Step 1: Scan for files
     console.log(chalk.yellow('Step 1: Scanning files...'));
     const inventory = new FileInventory(this.srcPath);
     const files = await inventory.scan();
     console.log(chalk.green(`   ✓ Found ${files.length} files\n`));
 
-
+    // Step 2: Index all top-level AST nodes with UUIDs
     console.log(chalk.yellow('Step 2: Indexing top-level AST nodes...'));
     const indexer = new ProjectIndexer(this.srcPath, this.options);
     const maps = await indexer.indexAll(files);
-
+    
     const stats = indexer.getStats();
     console.log(chalk.green(`   ✓ Total nodes:       ${stats.totalNodes}`));
     console.log(chalk.green(`   ✓ Import nodes:      ${stats.importNodes}`));
@@ -67,13 +67,13 @@ class Atomizer {
    * - External dependants: Nodes in other files that import and use it
    */
   async traceAllDependencies() {
-
+    // First, run the indexing phase
     const { indexer, maps, stats, files } = await this.index();
 
     console.log(chalk.yellow('Step 3: Tracing declaration dependencies...'));
     const tracer = new DependencyTracer(indexer);
     const traced = tracer.traceAll();
-
+    
     const summary = tracer.getSummary();
     console.log(chalk.green(`   ✓ Traced ${summary.totalDeclarations} declarations`));
     console.log(chalk.green(`   ✓ With internal dependants: ${summary.withInternalDependants}`));
@@ -139,7 +139,7 @@ class Atomizer {
 
     console.log(chalk.cyan('\n🔗 Declaration Dependencies:\n'));
 
-
+    // Group by file
     const byFile = new Map();
     for (const [uuid, node] of traced) {
       const rel = node.relativePath;
@@ -151,7 +151,7 @@ class Atomizer {
 
     for (const [file, nodes] of byFile) {
       console.log(chalk.white.bold(`📄 ${file}`));
-
+      
       for (const node of nodes) {
         const names = node.declaredNames?.join(', ') || 'anonymous';
         const exported = node.isExported ? chalk.green('[exported]') : chalk.gray('[internal]');
@@ -189,19 +189,19 @@ class Atomizer {
     console.log(chalk.blue('📦 Starting Atomizer analysis...'));
     console.log(chalk.gray(`   Source: ${this.srcPath}\n`));
 
-
+    // Step 1: Parse & Inventory
     console.log(chalk.yellow('Step 1: Parsing & Inventory'));
     const inventory = new FileInventory(this.srcPath);
     const files = await inventory.scan();
     console.log(chalk.green(`   ✓ Found ${files.length} files\n`));
 
-
+    // Step 1b: Index all top-level AST nodes with UUIDs for dependency tracing
     console.log(chalk.yellow('Step 1b: Indexing AST nodes...'));
     const indexer = new ProjectIndexer(this.srcPath, this.options);
     await indexer.indexAll(files);
     console.log(chalk.green(`   ✓ Indexed ${indexer.getStats().totalNodes} nodes\n`));
 
-
+    // Step 1c: Trace declaration dependencies
     console.log(chalk.yellow('Step 1c: Tracing declaration dependencies...'));
     const tracer = new DependencyTracer(indexer);
     const traced = tracer.traceAll();
@@ -209,34 +209,34 @@ class Atomizer {
     console.log(chalk.green(`   ✓ Traced ${tracerSummary.totalDeclarations} declarations`));
     console.log(chalk.green(`   ✓ With external dependants: ${tracerSummary.withExternalDependants}\n`));
 
-
+    // Step 2: AST Analysis & Resolution
     console.log(chalk.yellow('Step 2: AST Analysis & Module Resolution'));
     const analyzer = new ASTAnalyzer(this.srcPath, this.options);
     const analysisResults = await analyzer.analyzeAll(files);
-
+    
     const components = analysisResults.filter(f => f.classification === 'component');
     const nonComponents = analysisResults.filter(f => f.classification !== 'component');
-
+    
     console.log(chalk.green(`   ✓ Components: ${components.length}`));
     console.log(chalk.green(`   ✓ Non-Components: ${nonComponents.length}`));
-
+    
     console.log();
 
-
+    // Step 3: Build Dual Graphs
     console.log(chalk.yellow('Step 3: Building Dual Graphs'));
     const graphBuilder = new GraphBuilder(analysisResults);
     const { renderTree, dependencyGraph } = graphBuilder.build();
     console.log(chalk.green(`   ✓ Render Tree: ${renderTree.nodeCount} nodes, ${renderTree.edgeCount} edges`));
     console.log(chalk.green(`   ✓ Dependency Graph: ${dependencyGraph.nodeCount} nodes, ${dependencyGraph.edgeCount} edges\n`));
 
-
+    // Step 4: Compute New Structure
     console.log(chalk.yellow('Step 4: Computing New Structure'));
     const structureComputer = new StructureComputer(
       analysisResults,
       renderTree,
       dependencyGraph,
       this.srcPath,
-      tracer
+      tracer  // Pass the dependency tracer for precise dependency info
     );
     const newStructure = structureComputer.compute();
     console.log(chalk.green(`   ✓ Computed ${newStructure.moves.length} file moves\n`));
@@ -248,16 +248,16 @@ class Atomizer {
       renderTree,
       dependencyGraph,
       newStructure,
-      tracer,
-      traced,
+      tracer,  // Include tracer for downstream use
+      traced,  // Include traced declarations
     };
   }
 
   async trace(targetFilePath) {
     const absolutePath = path.resolve(targetFilePath);
     console.log(chalk.blue(`🔍 Tracing symbols in: ${targetFilePath}`));
-
-
+    
+    // We still need to analyze the whole project to find external consumers
     console.log(chalk.yellow('Step 1: Scanning files...'));
     const inventory = new FileInventory(this.srcPath);
     const files = await inventory.scan();
@@ -281,7 +281,7 @@ class Atomizer {
     for (const symbol of symbols) {
       const exportStatus = symbol.isExported ? chalk.green('[EXPORTED]') : chalk.gray('[INTERNAL]');
       console.log(`${exportStatus} ${chalk.white.bold(symbol.name)} (${symbol.type})`);
-
+      
       if (symbol.internalConsumers.length > 0) {
         console.log(`   ${chalk.yellow('Internal Consumers:')}`);
         symbol.internalConsumers.forEach(c => console.log(`     - ${c}`));
@@ -304,25 +304,25 @@ class Atomizer {
     console.log(chalk.blue('           ANALYSIS RESULTS'));
     console.log(chalk.blue('═══════════════════════════════════════\n'));
 
-
+    // Components
     console.log(chalk.cyan('📦 Components:'));
     for (const comp of result.components) {
       const relativePath = path.relative(this.srcPath, comp.filePath);
       console.log(`   ${chalk.white(comp.name)} ${chalk.gray(`(${relativePath})`)}`);
     }
 
-
+    // Non-Components
     console.log(chalk.cyan('\n📄 Non-Components:'));
     for (const file of result.nonComponents) {
       const relativePath = path.relative(this.srcPath, file.filePath);
       console.log(`   ${chalk.white(file.name)} ${chalk.gray(`[${file.classification}]`)} ${chalk.gray(`(${relativePath})`)}`);
     }
 
-
+    // Render Tree
     console.log(chalk.cyan('\n🌳 Render Tree (Component Composition):'));
     this.printTree(result.renderTree, result.components);
 
-
+    // Proposed Structure
     console.log(chalk.cyan('\n📁 Proposed Structure:'));
     this.printProposedStructure(result.newStructure);
   }
@@ -330,14 +330,14 @@ class Atomizer {
   printTree(renderTree, components) {
     const roots = renderTree.getRoots();
     const visited = new Set();
-
+    
     for (const root of roots) {
       this.printTreeNode(root, renderTree, '', true, visited, 0);
     }
   }
 
   printTreeNode(nodeId, tree, prefix, isLast, visited, depth) {
-
+    // Prevent infinite recursion
     if (visited.has(nodeId) || depth > 10) {
       const connector = isLast ? '└── ' : '├── ';
       const node = tree.getNode(nodeId);
@@ -347,18 +347,18 @@ class Atomizer {
       }
       return;
     }
-
+    
     visited.add(nodeId);
-
+    
     const connector = isLast ? '└── ' : '├── ';
     const node = tree.getNode(nodeId);
     const name = node ? node.name : nodeId;
-
+    
     console.log(`   ${prefix}${connector}${chalk.green(name)}`);
-
+    
     const children = tree.getChildren(nodeId);
     const childPrefix = prefix + (isLast ? '    ' : '│   ');
-
+    
     children.forEach((child, index) => {
       this.printTreeNode(child, tree, childPrefix, index === children.length - 1, visited, depth + 1);
     });
@@ -401,7 +401,7 @@ class Atomizer {
   async execute(traceResult, outputPath, options = {}) {
     const targetPath = outputPath || path.join(path.dirname(this.srcPath), 'atomicSrc');
 
-
+    // Migrator now solely works with traced data
     const migrator = new Migrator(this.srcPath, targetPath, traceResult.tracer);
     await migrator.execute();
   }

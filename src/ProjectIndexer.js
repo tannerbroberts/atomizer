@@ -5,30 +5,30 @@ const { v4: uuidv4 } = require('uuid');
 
 /**
  * ProjectIndexer - Phase 1 of the Atomizer pipeline
- * 
+ *
  * Crawls the src directory, parsing every .js, .jsx, .ts, and .tsx file.
  * For every top-level node in the AST representation of a file:
  *   - Adds a uuid-key to the project map with that node as an object
  *   - Adds a custom property 'filePath' (absolute path to source file)
- * 
+ *
  * Maintains 4 separate maps referencing the same objects by UUID:
  *   - project: All top-level nodes
  *   - imports: Import declaration nodes
- *   - exports: Export declaration nodes  
+ *   - exports: Export declaration nodes
  *   - declarations: Variable/function/class/type declarations
  */
 class ProjectIndexer {
   constructor(srcPath, options = {}) {
     this.srcPath = path.resolve(srcPath);
     this.options = options;
-    
-    // The four main maps as described in README
-    this.project = new Map();      // uuid -> node object
-    this.imports = new Map();      // uuid -> node object (import nodes only)
-    this.exports = new Map();      // uuid -> node object (export nodes only)
-    this.declarations = new Map(); // uuid -> node object (declaration nodes only)
-    
-    // Load path aliases from tsconfig/jsconfig
+
+
+    this.project = new Map();
+    this.imports = new Map();
+    this.exports = new Map();
+    this.declarations = new Map();
+
+
     const { aliasMap, baseUrl } = this.loadAliases();
     this.aliasMap = aliasMap;
     this.baseUrl = baseUrl;
@@ -37,11 +37,11 @@ class ProjectIndexer {
   loadAliases() {
     let configPath = null;
     let searchDir = this.srcPath;
-    
+
     for (let i = 0; i < 3; i++) {
       const tsconfigPath = path.join(searchDir, 'tsconfig.json');
       const jsconfigPath = path.join(searchDir, 'jsconfig.json');
-      
+
       if (fs.existsSync(tsconfigPath)) {
         configPath = tsconfigPath;
         break;
@@ -51,31 +51,31 @@ class ProjectIndexer {
       }
       searchDir = path.dirname(searchDir);
     }
-    
+
     let config = null;
     let configDir = this.srcPath;
-    
+
     if (configPath) {
       try {
         const content = fs.readFileSync(configPath, 'utf-8');
         config = JSON.parse(content);
         configDir = path.dirname(configPath);
       } catch (e) {
-        // Ignore parse errors
+
       }
     }
 
     const aliases = {};
     let baseUrl = null;
-    
+
     if (config?.compilerOptions?.baseUrl) {
       baseUrl = path.resolve(configDir, config.compilerOptions.baseUrl);
     }
-    
+
     if (config?.compilerOptions?.paths) {
       const pathsBaseUrl = baseUrl || configDir;
       const paths = config.compilerOptions.paths;
-      
+
       for (const [alias, targets] of Object.entries(paths)) {
         const aliasPattern = alias.replace('*', '(.*)');
         const targetPattern = targets[0]?.replace('*', '$1') || '';
@@ -91,7 +91,7 @@ class ProjectIndexer {
    * @returns {Object} - { project, imports, exports, declarations }
    */
   async indexAll(files) {
-    const codeFiles = files.filter(f => 
+    const codeFiles = files.filter(f =>
       ['.js', '.jsx', '.ts', '.tsx'].includes(f.extension)
     );
 
@@ -119,7 +119,7 @@ class ProjectIndexer {
   async indexFile(file) {
     const content = fs.readFileSync(file.absolutePath, 'utf-8');
     const enableJsx = file.extension === '.tsx' || file.extension === '.jsx';
-    
+
     const ast = parse(content, {
       jsx: enableJsx,
       loc: true,
@@ -129,11 +129,11 @@ class ProjectIndexer {
       errorOnUnknownASTType: false,
     });
 
-    // Process each top-level node in the AST body
+
     for (const node of ast.body) {
       const uuid = uuidv4();
-      
-      // Create an enriched node object with filePath property
+
+
       const enrichedNode = {
         uuid,
         filePath: file.absolutePath,
@@ -145,10 +145,10 @@ class ProjectIndexer {
         ...this.extractNodeDetails(node, content),
       };
 
-      // Add to project map (all nodes go here)
+
       this.project.set(uuid, enrichedNode);
 
-      // Categorize into appropriate specialized maps
+
       this.categorizeNode(uuid, enrichedNode, node);
     }
   }
@@ -158,14 +158,14 @@ class ProjectIndexer {
    */
   extractNodeDetails(node, content) {
     const details = {
-      names: [],           // All names declared/exported/imported by this node
+      names: [],
       isExported: false,
       isDefaultExport: false,
       exportedNames: [],
       importedNames: [],
       declaredNames: [],
       importSource: null,
-      exportSource: null,  // For re-exports
+      exportSource: null,
     };
 
     switch (node.type) {
@@ -178,18 +178,18 @@ class ProjectIndexer {
       case 'ExportNamedDeclaration':
         details.isExported = true;
         if (node.source) {
-          // Re-export: export { x } from './module'
+
           details.exportSource = node.source.value;
           details.exportedNames = this.extractExportSpecifiers(node);
           details.names = details.exportedNames.map(s => s.exported);
         } else if (node.declaration) {
-          // Export with declaration: export const x = ...
+
           const declared = this.extractDeclarationNames(node.declaration);
           details.declaredNames = declared;
           details.exportedNames = declared.map(name => ({ local: name, exported: name }));
           details.names = declared;
         } else if (node.specifiers) {
-          // Export existing: export { x, y }
+
           details.exportedNames = this.extractExportSpecifiers(node);
           details.names = details.exportedNames.map(s => s.exported);
         }
@@ -219,23 +219,23 @@ class ProjectIndexer {
       case 'VariableDeclaration':
         details.declaredNames = this.extractDeclarationNames(node);
         details.names = details.declaredNames;
-        // Check if this is a require() import
+
         for (const declarator of node.declarations) {
           const requireSource = this.extractRequireSource(declarator.init);
           if (requireSource) {
             details.importSource = requireSource;
             details.isRequireImport = true;
-            // Build import specifiers from the variable pattern
+
             const names = this.extractPatternNames(declarator.id);
             if (declarator.id.type === 'Identifier') {
-              // const x = require('./x') - default-like import
+
               details.importedNames.push({
                 type: 'require-default',
                 local: declarator.id.name,
                 imported: 'default',
               });
             } else if (declarator.id.type === 'ObjectPattern') {
-              // const { a, b } = require('./x') - named imports
+
               for (const prop of declarator.id.properties) {
                 if (prop.type === 'Property' && prop.key?.name) {
                   const local = prop.value?.name || prop.key.name;
@@ -295,25 +295,25 @@ class ProjectIndexer {
         break;
 
       case 'ExpressionStatement': {
-        // Handle CommonJS exports: module.exports = X or exports.X = Y
+
         const expr = node.expression;
         if (expr?.type === 'AssignmentExpression') {
           const left = expr.left;
           const right = expr.right;
-          
-          // module.exports = X
+
+
           if (left?.type === 'MemberExpression' &&
               left.object?.name === 'module' &&
               left.property?.name === 'exports') {
             details.isExported = true;
             details.isDefaultExport = true;
-            
+
             if (right?.type === 'Identifier') {
-              // module.exports = SomeClass
+
               details.exportedNames = [{ local: right.name, exported: 'default' }];
               details.names = [right.name, 'default'];
             } else if (right?.type === 'ObjectExpression') {
-              // module.exports = { a, b, c }
+
               for (const prop of right.properties || []) {
                 if (prop.type === 'Property' && prop.key?.name) {
                   const exported = prop.key.name;
@@ -323,13 +323,13 @@ class ProjectIndexer {
                 }
               }
             } else {
-              // Anonymous export
+
               details.exportedNames = [{ local: 'default', exported: 'default' }];
               details.names = ['default'];
             }
           }
-          
-          // exports.X = Y
+
+
           if (left?.type === 'MemberExpression' &&
               left.object?.name === 'exports' &&
               left.property?.name) {
@@ -352,7 +352,7 @@ class ProjectIndexer {
    */
   extractImportSpecifiers(node) {
     const specifiers = [];
-    
+
     for (const spec of node.specifiers || []) {
       if (spec.type === 'ImportDefaultSpecifier') {
         specifiers.push({
@@ -374,7 +374,7 @@ class ProjectIndexer {
         });
       }
     }
-    
+
     return specifiers;
   }
 
@@ -383,14 +383,14 @@ class ProjectIndexer {
    */
   extractExportSpecifiers(node) {
     const specifiers = [];
-    
+
     for (const spec of node.specifiers || []) {
       specifiers.push({
         local: spec.local.name,
         exported: spec.exported.name,
       });
     }
-    
+
     return specifiers;
   }
 
@@ -399,7 +399,7 @@ class ProjectIndexer {
    */
   extractDeclarationNames(node) {
     const names = [];
-    
+
     if (!node) return names;
 
     switch (node.type) {
@@ -432,7 +432,7 @@ class ProjectIndexer {
    */
   extractPatternNames(pattern) {
     const names = [];
-    
+
     if (!pattern) return names;
 
     switch (pattern.type) {
@@ -476,22 +476,22 @@ class ProjectIndexer {
    */
   extractRequireSource(node) {
     if (!node) return null;
-    
-    // Direct require: require('./x')
-    if (node.type === 'CallExpression' && 
+
+
+    if (node.type === 'CallExpression' &&
         node.callee?.name === 'require' &&
         node.arguments?.[0]?.type === 'Literal') {
       return node.arguments[0].value;
     }
-    
-    // Member access on require: require('./x').something
+
+
     if (node.type === 'MemberExpression' &&
         node.object?.type === 'CallExpression' &&
         node.object?.callee?.name === 'require' &&
         node.object?.arguments?.[0]?.type === 'Literal') {
       return node.object.arguments[0].value;
     }
-    
+
     return null;
   }
 
@@ -501,15 +501,15 @@ class ProjectIndexer {
   getDefaultExportName(node) {
     const decl = node.declaration;
     if (!decl) return 'default';
-    
+
     if (decl.id?.name) {
       return decl.id.name;
     }
-    
+
     if (decl.type === 'Identifier') {
       return decl.name;
     }
-    
+
     return 'default';
   }
 
@@ -519,26 +519,26 @@ class ProjectIndexer {
   categorizeNode(uuid, enrichedNode, originalNode) {
     const type = originalNode.type;
 
-    // Import nodes
+
     if (type === 'ImportDeclaration') {
       this.imports.set(uuid, enrichedNode);
       return;
     }
 
-    // Export nodes (may also be declarations)
-    if (type === 'ExportNamedDeclaration' || 
-        type === 'ExportDefaultDeclaration' || 
+
+    if (type === 'ExportNamedDeclaration' ||
+        type === 'ExportDefaultDeclaration' ||
         type === 'ExportAllDeclaration') {
       this.exports.set(uuid, enrichedNode);
-      
-      // If it has a declaration, also add to declarations
+
+
       if (originalNode.declaration && enrichedNode.declaredNames.length > 0) {
         this.declarations.set(uuid, enrichedNode);
       }
       return;
     }
 
-    // Declaration nodes (including require() imports which are also declarations)
+
     if (type === 'VariableDeclaration' ||
         type === 'FunctionDeclaration' ||
         type === 'ClassDeclaration' ||
@@ -547,20 +547,20 @@ class ProjectIndexer {
         type === 'TSEnumDeclaration' ||
         type === 'TSModuleDeclaration') {
       this.declarations.set(uuid, enrichedNode);
-      
-      // Also add to imports if it's a require() statement
+
+
       if (enrichedNode.isRequireImport) {
         this.imports.set(uuid, enrichedNode);
       }
       return;
     }
 
-    // Expression statements that are CommonJS exports
+
     if (type === 'ExpressionStatement') {
       const expr = originalNode.expression;
       if (expr?.type === 'AssignmentExpression') {
         const left = expr.left;
-        // module.exports = ... or exports.x = ...
+
         if (left?.type === 'MemberExpression') {
           if ((left.object?.name === 'module' && left.property?.name === 'exports') ||
               left.object?.name === 'exports') {
@@ -575,7 +575,7 @@ class ProjectIndexer {
    * Resolve a module path to an absolute file path
    */
   resolveModulePath(source, fromDir) {
-    // Handle aliases first
+
     for (const [pattern, replacement] of Object.entries(this.aliasMap)) {
       const regex = new RegExp(`^${pattern}$`);
       if (regex.test(source)) {
@@ -585,23 +585,23 @@ class ProjectIndexer {
       }
     }
 
-    // Handle @/ alias
+
     if (source.startsWith('@/')) {
       source = source.replace('@/', './');
       fromDir = this.srcPath;
     }
 
-    // Handle ~/ alias
+
     if (source.startsWith('~/')) {
       source = source.replace('~/', './');
       fromDir = this.srcPath;
     }
 
-    // Relative or absolute paths
+
     if (source.startsWith('.') || source.startsWith('/')) {
       let resolved = path.resolve(fromDir, source);
       const extensions = ['', '.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.tsx', '/index.js', '/index.jsx'];
-      
+
       for (const ext of extensions) {
         const candidate = resolved + ext;
         if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
@@ -611,11 +611,11 @@ class ProjectIndexer {
       return resolved;
     }
 
-    // Handle baseUrl imports
+
     if (this.baseUrl) {
       const baseUrlResolved = path.join(this.baseUrl, source);
       const extensions = ['', '.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.tsx', '/index.js', '/index.jsx'];
-      
+
       for (const ext of extensions) {
         const candidate = baseUrlResolved + ext;
         if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
@@ -624,7 +624,7 @@ class ProjectIndexer {
       }
     }
 
-    // External package
+
     return null;
   }
 

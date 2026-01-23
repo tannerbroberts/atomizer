@@ -8,19 +8,19 @@ class ASTAnalyzer {
     this.options = options;
     const { aliasMap, baseUrl } = this.loadAliases();
     this.aliasMap = aliasMap;
-    this.baseUrl = baseUrl; // Store baseUrl for resolving bare imports
+    this.baseUrl = baseUrl;
   }
 
   loadAliases() {
-    // Try to load tsconfig.json or jsconfig.json for path aliases
-    // Look in srcPath and parent directories
+
+
     let configPath = null;
     let searchDir = this.srcPath;
-    
+
     for (let i = 0; i < 3; i++) {
       const tsconfigPath = path.join(searchDir, 'tsconfig.json');
       const jsconfigPath = path.join(searchDir, 'jsconfig.json');
-      
+
       if (fs.existsSync(tsconfigPath)) {
         configPath = tsconfigPath;
         break;
@@ -30,33 +30,33 @@ class ASTAnalyzer {
       }
       searchDir = path.dirname(searchDir);
     }
-    
+
     let config = null;
     let configDir = this.srcPath;
-    
+
     if (configPath) {
       try {
         const content = fs.readFileSync(configPath, 'utf-8');
         config = JSON.parse(content);
         configDir = path.dirname(configPath);
       } catch (e) {
-        // Ignore parse errors
+
       }
     }
 
     const aliases = {};
     let baseUrl = null;
-    
+
     if (config?.compilerOptions?.baseUrl) {
       baseUrl = path.resolve(configDir, config.compilerOptions.baseUrl);
     }
-    
+
     if (config?.compilerOptions?.paths) {
       const pathsBaseUrl = baseUrl || configDir;
       const paths = config.compilerOptions.paths;
-      
+
       for (const [alias, targets] of Object.entries(paths)) {
-        // Convert @/* pattern to regex
+
         const aliasPattern = alias.replace('*', '(.*)');
         const targetPattern = targets[0]?.replace('*', '$1') || '';
         aliases[aliasPattern] = path.join(pathsBaseUrl, targetPattern);
@@ -67,7 +67,7 @@ class ASTAnalyzer {
   }
 
   async analyzeAll(files) {
-    const codeFiles = files.filter(f => 
+    const codeFiles = files.filter(f =>
       ['.js', '.jsx', '.ts', '.tsx'].includes(f.extension)
     );
 
@@ -78,7 +78,7 @@ class ASTAnalyzer {
         const result = await this.analyzeFile(file);
         results.push(result);
       } catch (error) {
-        // Skip files that can't be parsed
+
         results.push({
           ...file,
           filePath: file.absolutePath,
@@ -91,12 +91,12 @@ class ASTAnalyzer {
       }
     }
 
-    // Add non-code files as assets or config
-    const nonCodeFiles = files.filter(f => 
+
+    const nonCodeFiles = files.filter(f =>
       !['.js', '.jsx', '.ts', '.tsx'].includes(f.extension)
     );
 
-    // Root-level config files that should never be moved
+
     const rootConfigPatterns = [
       'package.json', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml',
       'tsconfig.json', 'jsconfig.json', 'tsconfig.*.json',
@@ -118,7 +118,7 @@ class ASTAnalyzer {
     ];
 
     for (const file of nonCodeFiles) {
-      // Check if it's a root-level config file
+
       const isRootConfig = rootConfigPatterns.some(pattern => {
         const fileName = file.name + file.extension;
         if (pattern.includes('*')) {
@@ -128,8 +128,8 @@ class ASTAnalyzer {
         return fileName === pattern || fileName.startsWith(pattern + '.');
       });
 
-      // Also check if file is at project root (no subdirectories in relativePath)
-      const isAtRoot = !file.relativePath.includes(path.sep) || 
+
+      const isAtRoot = !file.relativePath.includes(path.sep) ||
                        file.relativePath.split(path.sep).length <= 2;
 
       const classification = isRootConfig && isAtRoot ? 'root-config' : 'asset';
@@ -149,10 +149,10 @@ class ASTAnalyzer {
 
   async analyzeFile(file) {
     const content = fs.readFileSync(file.absolutePath, 'utf-8');
-    
-    // Only enable JSX parsing for files that might contain JSX
+
+
     const enableJsx = file.extension === '.tsx' || file.extension === '.jsx';
-    
+
     const ast = parse(content, {
       jsx: enableJsx,
       loc: true,
@@ -166,10 +166,10 @@ class ASTAnalyzer {
     const exports = this.extractExports(ast, content);
     const jsxElements = this.extractJSXElements(ast);
     const hasJSXReturn = this.hasJSXReturn(ast);
-    
+
     const classification = this.classifyFile(exports, hasJSXReturn, file);
-    
-    // Analyze exported hooks and components for single-export rule
+
+
     const exportedHooks = exports.filter(e => e.isHook);
     const exportedComponents = exports.filter(e => e.isComponent);
 
@@ -196,14 +196,14 @@ class ASTAnalyzer {
       if (node.type === 'ImportDeclaration') {
         const source = node.source.value;
         const resolvedPath = this.resolveModulePath(source, fileDir);
-        
+
         const specifiers = (node.specifiers || []).map(spec => ({
           type: spec.type,
           imported: spec.imported?.name || spec.local?.name,
           local: spec.local?.name,
         }));
 
-        // It's a package if it doesn't start with . AND we couldn't resolve it to a project file
+
         const isPackage = !source.startsWith('.') && !source.startsWith('@/') && !resolvedPath;
 
         imports.push({
@@ -215,8 +215,8 @@ class ASTAnalyzer {
         });
       }
 
-      // Handle dynamic imports
-      if (node.type === 'CallExpression' && 
+
+      if (node.type === 'CallExpression' &&
           node.callee?.type === 'Import') {
         const arg = node.arguments?.[0];
         if (arg?.type === 'Literal') {
@@ -234,7 +234,7 @@ class ASTAnalyzer {
         }
       }
 
-      // Handle require()
+
       if (node.type === 'CallExpression' &&
           node.callee?.name === 'require') {
         const arg = node.arguments?.[0];
@@ -253,13 +253,13 @@ class ASTAnalyzer {
         }
       }
 
-      // Handle re-exports: export { X } from './path' or export * from './path'
-      if ((node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration') 
+
+      if ((node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration')
           && node.source) {
         const source = node.source.value;
         const resolvedPath = this.resolveModulePath(source, fileDir);
         const isPackage = !source.startsWith('.') && !source.startsWith('@/') && !resolvedPath;
-        
+
         const specifiers = (node.specifiers || []).map(spec => ({
           type: 'reexport',
           imported: spec.local?.name,
@@ -291,7 +291,7 @@ class ASTAnalyzer {
   }
 
   resolveModulePath(source, fromDir) {
-    // Handle aliases first
+
     for (const [pattern, replacement] of Object.entries(this.aliasMap)) {
       const regex = new RegExp(`^${pattern}$`);
       if (regex.test(source)) {
@@ -301,25 +301,25 @@ class ASTAnalyzer {
       }
     }
 
-    // Handle @/ alias (common convention)
+
     if (source.startsWith('@/')) {
       source = source.replace('@/', './');
       fromDir = this.srcPath;
     }
 
-    // Handle ~/ alias
+
     if (source.startsWith('~/')) {
       source = source.replace('~/', './');
       fromDir = this.srcPath;
     }
 
-    // If it's a relative path, resolve from current dir
+
     if (source.startsWith('.') || source.startsWith('/')) {
       let resolved = path.resolve(fromDir, source);
 
-      // Try different extensions
+
       const extensions = ['', '.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.tsx', '/index.js', '/index.jsx'];
-      
+
       for (const ext of extensions) {
         const candidate = resolved + ext;
         if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
@@ -330,14 +330,14 @@ class ASTAnalyzer {
       return resolved;
     }
 
-    // Handle bare imports with baseUrl (e.g., "components/layout/footer")
+
     if (this.baseUrl && !source.includes('node_modules')) {
-      // Check if it could be a baseUrl-relative import
+
       const baseUrlResolved = path.join(this.baseUrl, source);
-      
-      // Try different extensions
+
+
       const extensions = ['', '.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.tsx', '/index.js', '/index.jsx'];
-      
+
       for (const ext of extensions) {
         const candidate = baseUrlResolved + ext;
         if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
@@ -346,27 +346,27 @@ class ASTAnalyzer {
       }
     }
 
-    // External package or unresolvable
+
     return null;
   }
 
   extractExports(ast, fileContent) {
     const exports = [];
-    
-    // Build a map of function/variable declarations to check if they return JSX
+
+
     const declarationMap = new Map();
-    
-    // First pass: collect all declarations and check if they return JSX
+
+
     const collectDeclarations = (node, parentName = null) => {
       if (!node || typeof node !== 'object') return;
-      
+
       if (node.type === 'FunctionDeclaration' && node.id?.name) {
         declarationMap.set(node.id.name, {
           type: 'function',
           returnsJSX: this.functionReturnsJSX(node),
         });
       }
-      
+
       if (node.type === 'VariableDeclaration') {
         for (const declarator of node.declarations) {
           if (declarator.id?.type === 'Identifier') {
@@ -377,15 +377,15 @@ class ASTAnalyzer {
                 returnsJSX: this.functionReturnsJSX(init),
               });
             } else if (init?.type === 'CallExpression') {
-              // Handle React.forwardRef, React.memo, etc.
+
               const callee = init.callee;
-              const isReactWrapper = 
-                (callee?.type === 'MemberExpression' && 
-                 callee.object?.name === 'React' && 
+              const isReactWrapper =
+                (callee?.type === 'MemberExpression' &&
+                 callee.object?.name === 'React' &&
                  ['forwardRef', 'memo', 'lazy'].includes(callee.property?.name)) ||
-                (callee?.type === 'Identifier' && 
+                (callee?.type === 'Identifier' &&
                  ['forwardRef', 'memo', 'lazy'].includes(callee.name));
-              
+
               if (isReactWrapper && init.arguments?.[0]) {
                 const arg = init.arguments[0];
                 if (arg.type === 'ArrowFunctionExpression' || arg.type === 'FunctionExpression') {
@@ -399,7 +399,7 @@ class ASTAnalyzer {
           }
         }
       }
-      
+
       for (const key in node) {
         const child = node[key];
         if (Array.isArray(child)) {
@@ -409,7 +409,7 @@ class ASTAnalyzer {
         }
       }
     };
-    
+
     collectDeclarations(ast);
 
     const visit = (node) => {
@@ -431,12 +431,12 @@ class ASTAnalyzer {
         } else if (decl?.type === 'ClassDeclaration') {
           name = decl.id?.name || 'default';
           kind = 'class';
-          // Check if render method returns JSX
+
           returnsJSX = this.classReturnsJSX(decl);
         } else if (decl?.type === 'Identifier') {
           name = decl.name;
           kind = 'identifier';
-          // Look up in declaration map
+
           const declInfo = declarationMap.get(name);
           if (declInfo) {
             returnsJSX = declInfo.returnsJSX;
@@ -445,21 +445,21 @@ class ASTAnalyzer {
 
         const isHook = name.startsWith('use') && /^use[A-Z]/.test(name);
         const isComponent = returnsJSX || (name !== 'default' && /^[A-Z]/.test(name) && kind !== 'class');
-        
+
         exports.push({ name, kind, isDefault: true, isHook, isComponent: returnsJSX });
       }
 
       if (node.type === 'ExportNamedDeclaration') {
         const decl = node.declaration;
-        
+
         if (decl?.type === 'FunctionDeclaration') {
           const name = decl.id?.name;
           const returnsJSX = this.functionReturnsJSX(decl);
           const isHook = name?.startsWith('use') && /^use[A-Z]/.test(name);
-          
-          exports.push({ 
-            name, 
-            kind: 'function', 
+
+          exports.push({
+            name,
+            kind: 'function',
             isDefault: false,
             isHook,
             isComponent: returnsJSX,
@@ -467,10 +467,10 @@ class ASTAnalyzer {
         } else if (decl?.type === 'ClassDeclaration') {
           const name = decl.id?.name;
           const returnsJSX = this.classReturnsJSX(decl);
-          
-          exports.push({ 
-            name, 
-            kind: 'class', 
+
+          exports.push({
+            name,
+            kind: 'class',
             isDefault: false,
             isHook: false,
             isComponent: returnsJSX,
@@ -482,10 +482,10 @@ class ASTAnalyzer {
               const declInfo = declarationMap.get(name);
               const isHook = name.startsWith('use') && /^use[A-Z]/.test(name);
               const returnsJSX = declInfo?.returnsJSX || false;
-              
-              exports.push({ 
-                name, 
-                kind: 'variable', 
+
+              exports.push({
+                name,
+                kind: 'variable',
                 isDefault: false,
                 isHook,
                 isComponent: returnsJSX,
@@ -494,14 +494,14 @@ class ASTAnalyzer {
           }
         }
 
-        // Handle export { foo, bar }
+
         if (node.specifiers) {
           for (const spec of node.specifiers) {
             const localName = spec.local?.name;
             const exportedName = spec.exported?.name || localName;
             const declInfo = declarationMap.get(localName);
             const isHook = exportedName?.startsWith('use') && /^use[A-Z]/.test(exportedName);
-            
+
             exports.push({
               name: exportedName,
               kind: 'reexport',
@@ -526,14 +526,14 @@ class ASTAnalyzer {
     visit(ast);
     return exports;
   }
-  
+
   functionReturnsJSX(funcNode) {
     if (!funcNode) return false;
-    
+
     const checkForJSX = (node) => {
       if (!node || typeof node !== 'object') return false;
       if (node.type === 'JSXElement' || node.type === 'JSXFragment') return true;
-      
+
       for (const key in node) {
         const child = node[key];
         if (Array.isArray(child)) {
@@ -544,20 +544,20 @@ class ASTAnalyzer {
       }
       return false;
     };
-    
-    // Arrow function with implicit return
+
+
     if (funcNode.type === 'ArrowFunctionExpression' && funcNode.expression) {
       return checkForJSX(funcNode.body);
     }
-    
-    // Check return statements
+
+
     const checkReturns = (node) => {
       if (!node || typeof node !== 'object') return false;
-      
+
       if (node.type === 'ReturnStatement' && node.argument) {
         if (checkForJSX(node.argument)) return true;
       }
-      
+
       for (const key in node) {
         const child = node[key];
         if (Array.isArray(child)) {
@@ -568,15 +568,15 @@ class ASTAnalyzer {
       }
       return false;
     };
-    
+
     return checkReturns(funcNode.body);
   }
-  
+
   classReturnsJSX(classNode) {
     if (!classNode?.body?.body) return false;
-    
+
     for (const member of classNode.body.body) {
-      if (member.type === 'MethodDefinition' && 
+      if (member.type === 'MethodDefinition' &&
           member.key?.name === 'render' &&
           member.value) {
         return this.functionReturnsJSX(member.value);
@@ -584,7 +584,7 @@ class ASTAnalyzer {
     }
     return false;
   }
-  
+
   extractJSXElements(ast) {
     const elements = [];
 
@@ -594,7 +594,7 @@ class ASTAnalyzer {
       if (node.type === 'JSXElement' || node.type === 'JSXFragment') {
         if (node.openingElement?.name) {
           const name = this.getJSXElementName(node.openingElement.name);
-          // Only track capitalized components (not HTML elements)
+
           if (name && /^[A-Z]/.test(name)) {
             elements.push({ name, loc: node.loc });
           }
@@ -631,7 +631,7 @@ class ASTAnalyzer {
     const checkForJSX = (node) => {
       if (!node || typeof node !== 'object') return false;
       if (node.type === 'JSXElement' || node.type === 'JSXFragment') return true;
-      
+
       for (const key in node) {
         const child = node[key];
         if (Array.isArray(child)) {
@@ -646,28 +646,28 @@ class ASTAnalyzer {
     const visit = (node) => {
       if (!node || typeof node !== 'object') return;
 
-      // Check function declarations and expressions
+
       if (node.type === 'FunctionDeclaration' ||
           node.type === 'FunctionExpression' ||
           node.type === 'ArrowFunctionExpression') {
-        
-        // Check return statements
+
+
         const checkReturns = (n) => {
           if (!n || typeof n !== 'object') return;
-          
+
           if (n.type === 'ReturnStatement' && n.argument) {
             if (checkForJSX(n.argument)) {
               found = true;
             }
           }
-          
-          // Arrow function implicit return
-          if (node.type === 'ArrowFunctionExpression' && 
-              node.expression && 
+
+
+          if (node.type === 'ArrowFunctionExpression' &&
+              node.expression &&
               checkForJSX(node.body)) {
             found = true;
           }
-          
+
           for (const key in n) {
             const child = n[key];
             if (Array.isArray(child)) {
@@ -697,19 +697,19 @@ class ASTAnalyzer {
 
   classifyFile(exports, hasJSXReturn, file) {
     const name = file.name.toLowerCase();
-    
-    // Check if it's a component (exports JSX)
+
+
     if (hasJSXReturn) {
       return 'component';
     }
 
-    // Check for test files FIRST - they follow their source file
-    if (name.includes('.test') || name.includes('.spec') || 
+
+    if (name.includes('.test') || name.includes('.spec') ||
         file.relativePath.includes('__tests__')) {
       return 'test';
     }
 
-    // Check common patterns
+
     if (name.startsWith('use') || name.includes('.hook')) {
       return 'hook';
     }
