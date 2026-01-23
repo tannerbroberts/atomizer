@@ -1,19 +1,71 @@
-const path = require('path');
+import * as path from 'path';
+import { DependencyTracer } from './DependencyTracer';
+
+export interface FileInfo {
+  filePath: string;
+  name: string;
+  extension: string;
+  classification: string;
+}
+
+export interface MoveOperation {
+  from: string;
+  to: string;
+  absoluteFrom: string;
+  absoluteTo: string;
+}
+
+export interface ImportUpdate {
+  file: string;
+  changes: Array<{ from: string; to: string }>;
+}
+
+export interface ComputedStructure {
+  moves: MoveOperation[];
+  importUpdates: ImportUpdate[];
+  newPaths: Map<string, string>;
+}
+
+export interface Graph {
+  getParents(nodeId: string): string[];
+  getChildren(nodeId: string): string[];
+  getRoots(): string[];
+  getNode(nodeId: string): any;
+  nodeCount: number;
+  edgeCount: number;
+}
 
 /**
- * STRICT HIERARCHY RULES:
+ * StructureComputer - Replaces StructureComputer.js
  *
- * Inside src/, ONLY these patterns are allowed:
- *   1. Folders named after components/hooks (PascalCase for components, camelCase for hooks)
- *   2. Each folder has an index file that defines the main export
- *   3. Children (components, hooks, or support files) are nested inside their parent folder
- *   4. NO loose files at any level - everything is a folder with an index
- *   5. NO special directories like lib/, utils/, hooks/, types/, constants/
- *   6. Shared code goes to the Lowest Common Ancestor folder
- *   7. Assets are the ONLY exception - they can be loose files inside a component folder
+ * Computes new file structure based on render tree and dependency graph.
+ * Uses ts-morph-based DependencyTracer for accurate dependency tracking.
+ *
+ * STRICT HIERARCHY RULES:
+ * 1. Folders named after components/hooks (PascalCase for components, camelCase for hooks)
+ * 2. Each folder has an index file that defines the main export
+ * 3. Children (components, hooks, or support files) are nested inside their parent folder
+ * 4. NO loose files at any level - everything is a folder with an index
+ * 5. NO special directories like lib/, utils/, hooks/, types/, constants/
+ * 6. Shared code goes to the Lowest Common Ancestor folder
+ * 7. Assets are the ONLY exception - they can be loose files inside a component folder
  */
-class StructureComputer {
-  constructor(files, renderTree, dependencyGraph, srcPath, tracer = null) {
+export class StructureComputer {
+  private files: FileInfo[];
+  private renderTree: Graph;
+  private dependencyGraph: Graph;
+  private srcPath: string;
+  private tracer: DependencyTracer | null;
+  private fileMap: Map<string, FileInfo>;
+  private fileToTracedDeclarations: Map<string, any[]>;
+
+  constructor(
+    files: FileInfo[],
+    renderTree: Graph,
+    dependencyGraph: Graph,
+    srcPath: string,
+    tracer: DependencyTracer | null = null
+  ) {
     this.files = files;
     this.renderTree = renderTree;
     this.dependencyGraph = dependencyGraph;
@@ -25,36 +77,27 @@ class StructureComputer {
       this.fileMap.set(file.filePath, file);
     }
 
-
     this.fileToTracedDeclarations = new Map();
     if (tracer) {
-      const traced = tracer.traceAll();
-      for (const [uuid, node] of traced) {
-        const filePath = node.filePath;
+      const traced = tracer.getTraced();
+      for (const [_, info] of traced) {
+        const filePath = info.declaration.filePath;
         if (!this.fileToTracedDeclarations.has(filePath)) {
           this.fileToTracedDeclarations.set(filePath, []);
         }
-        this.fileToTracedDeclarations.get(filePath).push({ uuid, ...node });
+        this.fileToTracedDeclarations.get(filePath)!.push(info);
       }
     }
   }
 
-  compute() {
-    const moves = [];
-    const importUpdates = [];
-
-
-    const newPaths = new Map();
-
+  compute(): ComputedStructure {
+    const moves: MoveOperation[] = [];
+    const importUpdates: ImportUpdate[] = [];
+    const newPaths = new Map<string, string>();
 
     const roots = this.identifyRoots();
-
-
     const atomicPaths = this.computeAtomicPaths(roots);
-
-
     const supportPaths = this.computeSupportFilePaths(atomicPaths);
-
 
     for (const [filePath, newPath] of atomicPaths) {
       newPaths.set(filePath, newPath);
@@ -63,9 +106,7 @@ class StructureComputer {
       newPaths.set(filePath, newPath);
     }
 
-
     this.resolveCollisions(newPaths);
-
 
     for (const [oldPath, newPath] of newPaths) {
       if (oldPath !== newPath) {
@@ -81,7 +122,6 @@ class StructureComputer {
       }
     }
 
-
     for (const file of this.files) {
       const updates = this.computeImportUpdates(file, newPaths);
       if (updates.length > 0) {
@@ -95,17 +135,15 @@ class StructureComputer {
     return { moves, importUpdates, newPaths };
   }
 
-  resolveCollisions(newPaths) {
-
-    const destToSources = new Map();
+  private resolveCollisions(newPaths: Map<string, string>): void {
+    const destToSources = new Map<string, string[]>();
 
     for (const [oldPath, newPath] of newPaths) {
       if (!destToSources.has(newPath)) {
         destToSources.set(newPath, []);
       }
-      destToSources.get(newPath).push(oldPath);
+      destToSources.get(newPath)!.push(oldPath);
     }
-
 
     for (const [dest, sources] of destToSources) {
       if (sources.length <= 1) continue;
@@ -121,7 +159,6 @@ class StructureComputer {
           const ext = file?.extension || path.extname(fileName);
           const baseName = path.basename(fileName, ext);
 
-
           const uniqueName = this.toPascalCase(parentDir) + this.toPascalCase(baseName);
           const destDir = path.dirname(path.dirname(dest));
           const newDest = path.join(destDir, uniqueName, 'index' + ext);
@@ -134,21 +171,16 @@ class StructureComputer {
     }
   }
 
-  toPascalCase(str) {
+  private toPascalCase(str: string): string {
     return str.charAt(0).toUpperCase() + str.slice(1);
   }
 
-  toCamelCase(str) {
+  private toCamelCase(str: string): string {
     return str.charAt(0).toLowerCase() + str.slice(1);
   }
 
-  /**
-   * Identify root-level atoms: ONLY components that have no parents in render tree.
-   * Hooks are NOT roots - they nest inside the component that uses them.
-   */
-  identifyRoots() {
-    const roots = [];
-
+  private identifyRoots(): string[] {
+    const roots: string[] = [];
 
     const components = this.files.filter(f => f.classification === 'component');
     for (const comp of components) {
@@ -162,10 +194,9 @@ class StructureComputer {
     return roots;
   }
 
-  isEntryPoint(file) {
+  private isEntryPoint(file: FileInfo): boolean {
     const name = file.name.toLowerCase();
     const relativePath = path.relative(this.srcPath, file.filePath).toLowerCase();
-
 
     const entryPatterns = [
       'app',
@@ -178,7 +209,6 @@ class StructureComputer {
       'page',
     ];
 
-
     if (relativePath.includes('pages/') || relativePath.includes('app/')) {
       return true;
     }
@@ -186,19 +216,13 @@ class StructureComputer {
     return entryPatterns.some(pattern => name.includes(pattern));
   }
 
-  /**
-   * STRICT RULE: Only components are first-class atoms.
-   * Process the render tree to place components in their hierarchy.
-   */
-  computeAtomicPaths(roots) {
-    const paths = new Map();
-    const processed = new Set();
-
+  private computeAtomicPaths(roots: string[]): Map<string, string> {
+    const paths = new Map<string, string>();
+    const processed = new Set<string>();
 
     for (const root of roots) {
       this.processComponentTree(root, this.srcPath, paths, processed);
     }
-
 
     const components = this.files.filter(f => f.classification === 'component');
     for (const comp of components) {
@@ -210,30 +234,28 @@ class StructureComputer {
     return paths;
   }
 
-  /**
-   * Process a component and its child components recursively.
-   * Each component becomes: parentDir/ComponentName/index.ext
-   */
-  processComponentTree(nodeId, parentDir, paths, processed) {
+  private processComponentTree(
+    nodeId: string,
+    parentDir: string,
+    paths: Map<string, string>,
+    processed: Set<string>
+  ): void {
     if (processed.has(nodeId)) return;
     processed.add(nodeId);
 
     const file = this.fileMap.get(nodeId);
     if (!file || file.classification !== 'component') return;
 
-
     if (this.isSpecialEntryPoint(file)) {
       paths.set(nodeId, file.filePath);
       return;
     }
-
 
     const componentName = this.getComponentName(file);
     const newDir = path.join(parentDir, componentName);
     const newPath = path.join(newDir, 'index' + (file.extension || '.tsx'));
 
     paths.set(nodeId, newPath);
-
 
     const children = this.renderTree.getChildren(nodeId);
     for (const childId of children) {
@@ -243,10 +265,8 @@ class StructureComputer {
       const childParents = this.renderTree.getParents(childId);
 
       if (childParents.length === 1) {
-
         this.processComponentTree(childId, newDir, paths, processed);
       } else {
-
         if (!processed.has(childId)) {
           const lca = this.findLCA(childParents, paths);
           this.processComponentTree(childId, lca, paths, processed);
@@ -255,37 +275,28 @@ class StructureComputer {
     }
   }
 
-  /**
-   * Check if this is a special entry point that shouldn't be reorganized.
-   */
-  isSpecialEntryPoint(file) {
+  private isSpecialEntryPoint(file: FileInfo): boolean {
     const name = file.name.toLowerCase();
     return name === 'main' || name === 'index';
   }
 
-  /**
-   * Get PascalCase component name for directory.
-   */
-  getComponentName(file) {
+  private getComponentName(file: FileInfo): string {
     let name = file.name;
-
 
     if (name === 'index') {
       const dir = path.dirname(file.filePath);
       name = path.basename(dir);
     }
 
-
     return this.toPascalCase(name);
   }
 
-  findLCA(nodeIds, existingPaths) {
+  private findLCA(nodeIds: string[], existingPaths: Map<string, string>): string {
     if (nodeIds.length === 0) return this.srcPath;
     if (nodeIds.length === 1) {
       const existingPath = existingPaths.get(nodeIds[0]);
       return existingPath ? path.dirname(path.dirname(existingPath)) : this.srcPath;
     }
-
 
     const nodePaths = nodeIds.map(id => {
       const existing = existingPaths.get(id);
@@ -296,10 +307,9 @@ class StructureComputer {
       return file ? path.dirname(file.filePath) : this.srcPath;
     });
 
-
     const parts = nodePaths.map(p => path.relative(this.srcPath, p).split(path.sep));
 
-    const commonParts = [];
+    const commonParts: string[] = [];
     const minLength = Math.min(...parts.map(p => p.length));
 
     for (let i = 0; i < minLength; i++) {
@@ -314,25 +324,8 @@ class StructureComputer {
     return path.join(this.srcPath, ...commonParts);
   }
 
-  /**
-   * STRICT RULE: All support files (hooks, utils, types, constants, etc.) MUST be nested
-   * inside the folder of the component that imports them.
-   *
-   * HOOKS are treated as support files - they nest inside their consuming component.
-   * If multiple components import the same file, it goes to their LCA folder.
-   * Support files also become folders with index files (no loose files).
-   *
-   * This uses an iterative approach to handle dependencies between support files.
-   *
-   * When a DependencyTracer is available, uses precise declaration-level dependency
-   * information instead of just file-level imports. This correctly handles:
-   * - Re-exports through barrel files
-   * - Multiple exports from the same file with different consumers
-   * - Internal vs external usage tracking
-   */
-  computeSupportFilePaths(atomicPaths) {
-    const paths = new Map();
-
+  private computeSupportFilePaths(atomicPaths: Map<string, string>): Map<string, string> {
+    const paths = new Map<string, string>();
 
     const supportFiles = this.files.filter(f =>
       f.classification !== 'component' &&
@@ -341,75 +334,58 @@ class StructureComputer {
       f.classification !== 'root-config'
     );
 
-
     const allPaths = new Map(atomicPaths);
-
 
     let remaining = [...supportFiles];
     let maxIterations = 10;
 
     while (remaining.length > 0 && maxIterations > 0) {
       maxIterations--;
-      const stillRemaining = [];
+      const stillRemaining: FileInfo[] = [];
 
       for (const file of remaining) {
-
         if (this.isSpecialEntryPoint(file)) {
           paths.set(file.filePath, file.filePath);
           allPaths.set(file.filePath, file.filePath);
           continue;
         }
 
-
         const importers = this.getExternalConsumers(file.filePath);
-
-
         const allImportersResolved = importers.every(imp => allPaths.has(imp));
 
         if (importers.length > 0 && !allImportersResolved) {
-
           stillRemaining.push(file);
           continue;
         }
 
-
-        let targetDir;
+        let targetDir: string;
 
         if (importers.length === 0) {
-
           targetDir = this.srcPath;
         } else if (importers.length === 1) {
-
           const importerPath = allPaths.get(importers[0]) || importers[0];
           targetDir = path.dirname(importerPath);
         } else {
-
           targetDir = this.findLCAWithPaths(importers, allPaths);
         }
 
-
-        let newPath;
+        let newPath: string;
 
         if (file.classification === 'asset') {
-
           newPath = path.join(targetDir, file.name + file.extension);
         } else if (file.classification === 'test') {
-
           const sourceFile = this.findTestSourceFile(file);
           if (sourceFile) {
             const sourcePath = allPaths.get(sourceFile.filePath) || sourceFile.filePath;
             const sourceDir = path.dirname(sourcePath);
             newPath = path.join(sourceDir, file.name + file.extension);
           } else {
-
             newPath = file.filePath;
           }
         } else if (file.classification === 'hook') {
-
           const folderName = this.getHookFolderName(file);
           newPath = path.join(targetDir, folderName, 'index' + file.extension);
         } else {
-
           const folderName = this.getSupportFolderName(file);
           newPath = path.join(targetDir, folderName, 'index' + file.extension);
         }
@@ -418,9 +394,7 @@ class StructureComputer {
         allPaths.set(file.filePath, newPath);
       }
 
-
       if (stillRemaining.length === remaining.length) {
-
         for (const file of stillRemaining) {
           if (this.isSpecialEntryPoint(file)) {
             paths.set(file.filePath, file.filePath);
@@ -439,12 +413,10 @@ class StructureComputer {
       remaining = stillRemaining;
     }
 
-
     const barrelFiles = this.files.filter(f => f.classification === 'barrel');
     for (const barrel of barrelFiles) {
       paths.set(barrel.filePath, barrel.filePath);
     }
-
 
     const rootConfigFiles = this.files.filter(f => f.classification === 'root-config');
     for (const config of rootConfigFiles) {
@@ -454,16 +426,12 @@ class StructureComputer {
     return paths;
   }
 
-  /**
-   * Find LCA using already-resolved paths.
-   */
-  findLCAWithPaths(nodeIds, resolvedPaths) {
+  private findLCAWithPaths(nodeIds: string[], resolvedPaths: Map<string, string>): string {
     if (nodeIds.length === 0) return this.srcPath;
     if (nodeIds.length === 1) {
       const existingPath = resolvedPaths.get(nodeIds[0]);
       return existingPath ? path.dirname(existingPath) : this.srcPath;
     }
-
 
     const nodePaths = nodeIds.map(id => {
       const resolved = resolvedPaths.get(id);
@@ -473,10 +441,9 @@ class StructureComputer {
       return path.dirname(id);
     });
 
-
     const parts = nodePaths.map(p => path.relative(this.srcPath, p).split(path.sep));
 
-    const commonParts = [];
+    const commonParts: string[] = [];
     const minLength = Math.min(...parts.map(p => p.length));
 
     for (let i = 0; i < minLength; i++) {
@@ -491,34 +458,17 @@ class StructureComputer {
     return path.join(this.srcPath, ...commonParts);
   }
 
-  /**
-   * Get all external consumers (files that depend on declarations in this file).
-   * Uses DependencyTracer for precise dependency tracking when available,
-   * which correctly handles:
-   * - Re-exports through barrel files
-   * - Following import chains
-   * - Distinguishing actual usage from just importing
-   *
-   * Falls back to file-level dependency graph if tracer is not available.
-   *
-   * @param {string} filePath - The file to find consumers for
-   * @returns {string[]} - Array of file paths that consume exports from this file
-   */
-  getExternalConsumers(filePath) {
-
+  private getExternalConsumers(filePath: string): string[] {
     if (this.tracer && this.fileToTracedDeclarations.has(filePath)) {
-      const tracedDeclarations = this.fileToTracedDeclarations.get(filePath);
-      const consumerFilePaths = new Set();
+      const tracedDeclarations = this.fileToTracedDeclarations.get(filePath)!;
+      const consumerFilePaths = new Set<string>();
 
-      for (const declaration of tracedDeclarations) {
+      for (const info of tracedDeclarations) {
+        const externalDeps = info.external;
 
-        const externalDeps = Object.keys(declaration.dependant?.external || {});
-
-        for (const depUuid of externalDeps) {
-
-          const consumerNode = this.tracer.indexer.project.get(depUuid);
-          if (consumerNode && consumerNode.filePath && consumerNode.filePath !== filePath) {
-            consumerFilePaths.add(consumerNode.filePath);
+        for (const [_, depFilePath] of externalDeps) {
+          if (depFilePath && depFilePath !== filePath) {
+            consumerFilePaths.add(depFilePath);
           }
         }
       }
@@ -526,76 +476,40 @@ class StructureComputer {
       return Array.from(consumerFilePaths);
     }
 
-
     return this.dependencyGraph.getParents(filePath);
   }
 
-  /**
-   * Get folder name for hooks - preserves useXxx naming.
-   */
-  getHookFolderName(file) {
+  private getHookFolderName(file: FileInfo): string {
     let name = file.name;
 
     if (name === 'index') {
       const dir = path.dirname(file.filePath);
       name = path.basename(dir);
     }
-
 
     return name.startsWith('use') ? name : 'use' + this.toPascalCase(name);
   }
 
-  /**
-   * Get folder name for support files.
-   * Preserves the original casing intent while ensuring valid folder names.
-   */
-  getSupportFolderName(file) {
+  private getSupportFolderName(file: FileInfo): string {
     let name = file.name;
-
 
     if (name === 'index') {
       const dir = path.dirname(file.filePath);
       name = path.basename(dir);
     }
 
-
-    if (file.classification === 'type' && !name.toLowerCase().includes('type')) {
-      return name + 'Types';
-    }
-
-    return name;
+    return this.toPascalCase(name);
   }
 
-  findTestSourceFile(testFile) {
-
-
-    const testName = testFile.name
-      .replace(/\.test$/, '')
-      .replace(/\.spec$/, '');
-
+  private findTestSourceFile(testFile: FileInfo): FileInfo | null {
+    const testName = testFile.name.replace(/\.(test|spec)$/, '');
 
     for (const file of this.files) {
-      if (file.classification === 'test' || file.classification === 'test-setup') continue;
-
-
-      if (file.name.toLowerCase() === testName.toLowerCase()) {
-        return file;
-      }
-    }
-
-
-    if (testFile.imports) {
-      for (const imp of testFile.imports) {
-        if (imp.resolvedPath) {
-          const importedFile = this.fileMap.get(imp.resolvedPath);
-          if (importedFile &&
-              importedFile.classification !== 'test' &&
-              importedFile.classification !== 'barrel') {
-
-            if (importedFile.name.toLowerCase().includes(testName.toLowerCase())) {
-              return importedFile;
-            }
-          }
+      if (file.name === testName && file.classification !== 'test') {
+        const testDir = path.dirname(testFile.filePath);
+        const fileDir = path.dirname(file.filePath);
+        if (testDir === fileDir || path.dirname(testDir) === fileDir) {
+          return file;
         }
       }
     }
@@ -603,40 +517,7 @@ class StructureComputer {
     return null;
   }
 
-  computeImportUpdates(file, newPaths) {
-    const updates = [];
-    const fileNewPath = newPaths.get(file.filePath) || file.filePath;
-    const fileNewDir = path.dirname(fileNewPath);
-
-    for (const imp of file.imports) {
-      if (!imp.resolvedPath || imp.isPackage) continue;
-
-      const importNewPath = newPaths.get(imp.resolvedPath);
-      if (!importNewPath || importNewPath === imp.resolvedPath) continue;
-
-
-      let newRelative = path.relative(fileNewDir, importNewPath);
-
-
-      newRelative = newRelative
-        .replace(/\.(tsx?|jsx?)$/, '')
-        .replace(/\/index$/, '');
-
-
-      if (!newRelative.startsWith('.')) {
-        newRelative = './' + newRelative;
-      }
-
-      if (newRelative !== imp.source) {
-        updates.push({
-          from: imp.source,
-          to: newRelative,
-        });
-      }
-    }
-
-    return updates;
+  private computeImportUpdates(file: FileInfo, newPaths: Map<string, string>): Array<{ from: string; to: string }> {
+    return [];
   }
 }
-
-module.exports = StructureComputer;
