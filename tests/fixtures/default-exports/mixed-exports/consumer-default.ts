@@ -1,4 +1,4 @@
-import mainUtil from '../Utils';
+import mainUtil from './utils';
 
 export const useMain = () => {
   return mainUtil();

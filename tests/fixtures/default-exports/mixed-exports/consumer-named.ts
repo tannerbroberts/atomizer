@@ -1,4 +1,4 @@
-import { helper, format } from '../Utils';
+import { helper, format } from './utils';
 
 export const useHelpers = () => {
   const result = helper();
