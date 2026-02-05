@@ -1,0 +1,48 @@
+.pointer-container {
+  position: fixed;
+  pointer-events: none;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pointer-arrow-body {
+  display: flex;
+  align-items: center;
+  animation: pointerSlide 0.8s infinite ease-in-out;
+  filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.6));
+  transform: translateX(-50%);
+  will-change: transform;
+}
+
+.pointer-arrow-shaft {
+  width: var(--arrow-length, 100px);
+  height: 12px;
+  background: linear-gradient(90deg, rgba(255, 68, 68, 0), #ff4444);
+  border-radius: 6px;
+}
+
+.pointer-arrow-head {
+  width: 0;
+  height: 0;
+  border-top: 15px solid transparent;
+  border-bottom: 15px solid transparent;
+  border-left: 25px solid #ff4444;
+  margin-left: -2px;
+}
+
+.pointer-content {
+  position: absolute;
+  top: 40px;
+  pointer-events: auto;
+}
+
+@keyframes pointerSlide {
+  0%, 100% {
+    transform: translateX(-60%);
+  }
+  50% {
+    transform: translateX(-40%);
+  }
+}

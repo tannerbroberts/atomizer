@@ -1,0 +1,242 @@
+/* MapCompletionOverlay uses Overlay component - these styles extend it */
+.map-completion-overlay.overlay-backdrop {
+  background-color: rgba(0, 0, 0, 0.95);
+}
+
+.map-completion-content {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.map-completion-scroll-area {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+  padding: 2rem;
+  max-width: 95vw;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.completion-grid-preview {
+  flex-shrink: 0;
+  pointer-events: none;
+  opacity: 0.9;
+  filter: brightness(0.8);
+}
+
+.completion-details {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 2rem;
+  background: linear-gradient(145deg, #1a1a2e, #16213e);
+  border: 3px solid rgba(74, 158, 255, 0.3);
+  border-radius: 20px;
+  min-width: 400px;
+  max-width: 500px;
+}
+
+.completion-title {
+  font-size: 3rem;
+  font-weight: 800;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.completion-title.success {
+  color: #4CAF50;
+  text-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
+}
+
+.completion-title.failure {
+  color: #f44336;
+  text-shadow: 0 0 20px rgba(244, 67, 54, 0.5);
+}
+
+.star-rating {
+  display: flex;
+  gap: 1rem;
+  font-size: 4rem;
+  margin: 1rem 0;
+}
+
+.star {
+  transition: all 0.3s ease;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+.star.filled {
+  color: #FFD700;
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+  animation: starPulse 2s ease-in-out infinite;
+}
+
+.star.empty {
+  color: rgba(255, 255, 255, 0.2);
+  text-shadow: none;
+}
+
+@keyframes starPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.completion-stats {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Courier New', monospace;
+  font-size: 1.2rem;
+}
+
+.stat-label {
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+}
+
+.stat-value {
+  color: white;
+  font-weight: bold;
+  font-size: 1.4rem;
+}
+
+.stat-value.perfect {
+  color: #4CAF50;
+}
+
+.stat-value.miss {
+  color: #ff9800;
+}
+
+.rating-description,
+.failure-message {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.6;
+  font-size: 1.1rem;
+  padding: 0 1rem;
+}
+
+.rating-description p,
+.failure-message p {
+  margin: 0.5rem 0;
+}
+
+.failure-message {
+  color: rgba(255, 100, 100, 0.9);
+}
+
+.completion-actions {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.retry-button,
+.continue-button {
+  flex: 1;
+  padding: 1rem 2rem;
+  font-size: 1.2rem;
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
+  border-radius: 12px;
+  border: 2px solid;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.retry-button {
+  background: linear-gradient(145deg, #ff9800, #f57c00);
+  border-color: #e65100;
+  color: white;
+}
+
+.retry-button:hover {
+  background: linear-gradient(145deg, #ffa726, #fb8c00);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 152, 0, 0.4);
+}
+
+.continue-button {
+  background: linear-gradient(145deg, #4a90e2, #357abd);
+  border-color: #2c5f87;
+  color: white;
+}
+
+.continue-button:hover {
+  background: linear-gradient(145deg, #5ba0f2, #4080cd);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(74, 144, 226, 0.4);
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+  .map-completion-scroll-area {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .completion-details {
+    min-width: unset;
+    width: 90%;
+  }
+}
+
+@media (max-width: 768px) {
+  .completion-title {
+    font-size: 2rem;
+  }
+
+  .star-rating {
+    font-size: 3rem;
+  }
+
+  .stat-row {
+    font-size: 1rem;
+  }
+
+  .stat-value {
+    font-size: 1.2rem;
+  }
+
+  .completion-details {
+    padding: 1.5rem;
+  }
+
+  .completion-actions {
+    flex-direction: column;
+  }
+
+  .retry-button,
+  .continue-button {
+    width: 100%;
+  }
+}

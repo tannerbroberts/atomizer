@@ -1,0 +1,45 @@
+.call-to-action-pointer-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 100, 200, 0.95);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #4fc3f7;
+  box-shadow: 0 0 15px rgba(79, 195, 247, 0.4);
+}
+
+.call-to-action-pointer-message {
+  color: white;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+.call-to-action-pointer-dismiss {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.call-to-action-pointer-dismiss:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: scale(1.1);
+}
+
+.call-to-action-pointer-dismiss:active {
+  transform: scale(0.95);
+}

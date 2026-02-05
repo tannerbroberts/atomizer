@@ -1,0 +1,57 @@
+.tile-base {
+  border-radius: var(--tile-border-radius);
+  position: relative;
+  z-index: var(--z-board);
+  transition: background-color 0.2s ease;
+  /* Default overlap for children positioning */
+  --block-overlap: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tile-icon-background {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.tile-base-dark {
+  background-color: var(--theme-tile-bg, rgb(59, 59, 62));
+}
+
+.tile-base-light {
+  background-color: var(--theme-tile-bg, rgb(40, 40, 50));
+}
+
+/* Custom tile backgrounds - highly saturated colors */
+.tile-base-custom.color-bg-grey {
+  background-color: #616161;
+}
+
+.tile-base-custom.color-bg-red {
+  background-color: #c62828;
+}
+
+.tile-base-custom.color-bg-orange {
+  background-color: #e65100;
+}
+
+.tile-base-custom.color-bg-yellow {
+  background-color: #f9a825;
+}
+
+.tile-base-custom.color-bg-green {
+  background-color: #2e7d32;
+}
+
+.tile-base-custom.color-bg-blue {
+  background-color: #1565c0;
+}
+
+.tile-base-custom.color-bg-purple {
+  background-color: #6a1b9a;
+}

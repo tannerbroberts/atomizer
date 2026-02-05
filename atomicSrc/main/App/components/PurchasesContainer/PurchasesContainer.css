@@ -1,0 +1,154 @@
+.purchases-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  /* Remove container styling */
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
+}
+
+.purchases-container-button {
+  /* Use unified game controls button size */
+  width: var(--game-controls-button-size);
+  height: var(--game-controls-button-size);
+  min-width: var(--game-controls-button-size);
+  min-height: var(--game-controls-button-size);
+  max-width: var(--game-controls-button-size);
+  max-height: var(--game-controls-button-size);
+  background: var(--theme-button-bg, rgba(0, 0, 0, 0.8));
+  border: 2px solid #4a90e2;
+  border-radius: 8px;
+  color: var(--theme-text, white);
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px;
+  position: relative;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  box-sizing: border-box;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.purchases-container-button:focus {
+  outline: none;
+}
+
+@media (hover: hover) {
+  .purchases-container-button:hover:not(.disabled) {
+    background: var(--theme-button-hover, rgba(74, 144, 226, 0.2));
+    border-color: #5ba3f5;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.purchases-container-button:active:not(.disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.purchases-container-button.disabled {
+  background: var(--theme-button-bg, rgba(0, 0, 0, 0.4));
+  border-color: var(--theme-text-secondary, #666);
+  color: var(--theme-text-secondary, #999);
+  opacity: 0.5;
+  cursor: pointer;
+  /* Changed from not-allowed to allow clicking for error feedback */
+  transform: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.purchases-container-button.active {
+  background: rgba(74, 144, 226, 0.6);
+  border-color: #5ba3f5;
+  box-shadow: 0 0 12px rgba(74, 144, 226, 0.6), 0 0 24px rgba(74, 144, 226, 0.4);
+  animation: purchases-container-glow 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes purchases-container-glow {
+  from {
+    box-shadow: 0 0 12px rgba(74, 144, 226, 0.6), 0 0 24px rgba(74, 144, 226, 0.4);
+  }
+
+  to {
+    box-shadow: 0 0 16px rgba(74, 144, 226, 0.8), 0 0 32px rgba(74, 144, 226, 0.6);
+  }
+}
+
+.purchases-container-icon {
+  /* Scale icon size based on button size */
+  font-size: calc(var(--game-controls-button-size) * 0.5);
+  font-weight: bold;
+  line-height: 1;
+  flex: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.purchases-container-cost {
+  /* Scale cost text based on button size */
+  font-size: calc(var(--game-controls-button-size) * 0.25);
+  opacity: 0.8;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.purchases-container-button.active .purchases-container-icon {
+  color: #fff;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+}
+
+.purchases-container-button.active .purchases-container-cost {
+  opacity: 0.6;
+}
+
+/* Portrait screens (taller than wide): horizontal layout below shape selector */
+@media (max-aspect-ratio: 1/1) {
+  .purchases-container {
+    flex-direction: row;
+    width: auto;
+    height: auto;
+    gap: 12px;
+    min-height: auto;
+  }
+}
+
+/* Landscape screens (wider than tall): vertical stacking next to shape selector */
+@media (min-aspect-ratio: 1/1) {
+  .purchases-container {
+    flex-direction: column;
+    height: auto;
+    gap: 12px;
+    /* Constrain to available space without scrollbars */
+    max-height: 100%;
+    overflow: hidden;
+    /* Never show scrollbars */
+    align-content: flex-start;
+    justify-content: flex-start;
+  }
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 480px) {
+  .purchases-container {
+    gap: 8px;
+    padding: 8px;
+  }
+}

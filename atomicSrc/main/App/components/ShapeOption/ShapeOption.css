@@ -1,0 +1,12 @@
+/* ShapeOption - Interactive wrapper around ShapeDisplay */
+.shape-option-container {
+  cursor: pointer;
+  touch-action: none;
+  transform-origin: center;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.shape-option-container.selected {
+  pointer-events: none;
+}

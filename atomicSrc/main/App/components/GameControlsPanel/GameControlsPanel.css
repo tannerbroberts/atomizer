@@ -1,0 +1,25 @@
+.game-controls-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Portrait screens (taller than wide): vertical stack */
+@media (max-aspect-ratio: 1/1) {
+  .game-controls-panel {
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-around;
+  }
+}
+
+/* Landscape screens (wider than tall): horizontal stack */
+@media (min-aspect-ratio: 1/1) {
+  .game-controls-panel {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-around;
+  }
+}

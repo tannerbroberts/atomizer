@@ -16,7 +16,10 @@ const GraphBuilder = require('./GraphBuilder');
 class Atomizer {
   constructor(srcPath, options = {}) {
     this.srcPath = path.resolve(srcPath);
-    this.options = options;
+    this.options = {
+      includeTests: false,
+      ...options,
+    };
     this.verbose = options.verbose || false;
   }
 
@@ -34,7 +37,7 @@ class Atomizer {
     console.log(chalk.gray(`   Source: ${this.srcPath}\n`));
 
     console.log(chalk.yellow('Step 1: Scanning files...'));
-    const inventory = new FileInventory(this.srcPath);
+    const inventory = new FileInventory(this.srcPath, this.options);
     const files = await inventory.scan();
     console.log(chalk.green(`   ✓ Found ${files.length} files\n`));
 
@@ -88,7 +91,7 @@ class Atomizer {
     console.log(chalk.gray(`   Source: ${this.srcPath}\n`));
 
     console.log(chalk.yellow('Step 1: Scanning files...'));
-    const inventory = new FileInventory(this.srcPath);
+    const inventory = new FileInventory(this.srcPath, this.options);
     const files = await inventory.scan();
     console.log(chalk.green(`   ✓ Found ${files.length} files\n`));
 
@@ -150,7 +153,7 @@ class Atomizer {
     const targetPath = outputPath || path.join(path.dirname(this.srcPath), 'atomicSrc');
 
     const analyzer = new ASTAnalyzer(this.srcPath, this.options);
-    const files = traceResult.files || await new FileInventory(this.srcPath).scan();
+    const files = traceResult.files || await new FileInventory(this.srcPath, this.options).scan();
     const analysisResults = await analyzer.analyzeAll(files);
 
     const graphBuilder = new GraphBuilder(analysisResults);

@@ -1,0 +1,28 @@
+/* Grid styles */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  grid-template-rows: repeat(10, 1fr);
+  position: relative;
+  touch-action: none;
+  gap: var(--grid-gap);
+  width: var(--grid-size);
+  height: var(--grid-size);
+  padding: var(--grid-gap);
+  box-sizing: content-box;
+}
+
+/* Grid editor mode - add visual indication and maintain square cells */
+.grid.grid-editor-mode {
+  outline: 2px dashed rgba(33, 150, 243, 0.5);
+  outline-offset: 4px;
+  background-color: rgba(33, 150, 243, 0.05);
+  /* Override dimensions - let grid-template define the size with square cells */
+  width: auto;
+  height: auto;
+}
+
+.grid.grid-editor-mode:hover {
+  outline-color: rgba(33, 150, 243, 0.7);
+  background-color: rgba(33, 150, 243, 0.1);
+}

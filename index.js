@@ -116,4 +116,76 @@ program
     }
   });
 
+program
+  .command('normalize-imports')
+  .description('Normalize import paths to use folder-level imports (lint rule: import-from-index)')
+  .argument('<srcPath>', 'Path to the src folder to normalize')
+  .option('--dry-run', 'Show what would be done without making changes')
+  .option('--verbose', 'Show detailed information')
+  .action(async (srcPath, options) => {
+    try {
+      const { ImportPathNormalizer } = require('./dist/core/ImportPathNormalizer');
+      const resolvedSrcPath = path.resolve(srcPath);
+
+      console.log(chalk.blue('🔧 Import Path Normalizer'));
+      console.log(chalk.gray(`Source: ${resolvedSrcPath}`));
+      console.log(chalk.gray(`Mode: ${options.dryRun ? 'DRY RUN' : 'LIVE'}\n`));
+
+      const normalizer = new ImportPathNormalizer(resolvedSrcPath);
+
+      if (options.dryRun) {
+        console.log(chalk.yellow('[DRY RUN] Would normalize imports and create barrel files'));
+        console.log(chalk.yellow('[DRY RUN] No files will be modified\n'));
+      } else {
+        await normalizer.normalize();
+        console.log(chalk.green('✓ Import paths normalized'));
+        console.log(chalk.green('✓ Barrel files created'));
+      }
+    } catch (error) {
+      console.error(chalk.red('Error:'), error.message);
+      if (options.verbose) {
+        console.error(error.stack);
+      }
+      process.exit(1);
+    }
+  });
+
+program
+  .command('inline-reexports')
+  .description('Inline re-exports to eliminate barrel export patterns (lint rule: no-reexports)')
+  .argument('<srcPath>', 'Path to the src folder')
+  .option('--dry-run', 'Show what would be done without making changes')
+  .option('--verbose', 'Show detailed information')
+  .action(async (srcPath, options) => {
+    try {
+      const { ReexportInliner } = require('./dist/core/ReexportInliner');
+      const resolvedSrcPath = path.resolve(srcPath);
+
+      console.log(chalk.blue('🔧 Re-export Inliner'));
+      console.log(chalk.gray(`Source: ${resolvedSrcPath}`));
+      console.log(chalk.gray(`Mode: ${options.dryRun ? 'DRY RUN' : 'LIVE'}\n`));
+
+      const inliner = new ReexportInliner(resolvedSrcPath);
+
+      if (options.dryRun) {
+        const reexports = await inliner.detectReexports();
+        console.log(chalk.yellow(`[DRY RUN] Would inline ${reexports.length} files with re-exports:`));
+        for (const file of reexports) {
+          console.log(chalk.gray(`  - ${file.relativePath} (${file.reexportCount} exports)`));
+        }
+        console.log(chalk.yellow('\n[DRY RUN] No files will be modified\n'));
+      } else {
+        await inliner.inlineReexports();
+        console.log(chalk.green('✓ Re-exports inlined'));
+        console.log(chalk.green('✓ Declarations moved to index files'));
+      }
+    } catch (error) {
+      console.error(chalk.red('Error:'), error.message);
+      if (options.verbose) {
+        console.error(error.stack);
+      }
+      process.exit(1);
+    }
+  });
+
 program.parse();

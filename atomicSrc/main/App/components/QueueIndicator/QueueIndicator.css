@@ -1,0 +1,74 @@
+.queue-indicator {
+  /* Part of flex layout - no absolute positioning */
+  position: relative;
+  
+  /* Square button - half the normal button size */
+  width: calc(var(--game-controls-button-size) * 0.5);
+  height: calc(var(--game-controls-button-size) * 0.5);
+  flex-shrink: 0;
+  
+  /* Styling */
+  background: var(--theme-button-bg, rgba(255, 255, 255, 0.1));
+  border: 2px solid var(--theme-shape-selector-border, rgba(255, 255, 255, 0.3));
+  border-radius: 8px;
+  
+  /* Text styling */
+  color: var(--theme-text, rgb(255, 255, 255));
+  font-size: 18px;
+  font-weight: 600;
+  
+  /* Center content */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  /* Transitions */
+  transition: all 0.2s ease;
+  
+  /* Cursor */
+  cursor: pointer;
+  
+  /* Remove default button styles */
+  padding: 0;
+  margin: 0;
+}
+
+/* Infinite mode - disabled state */
+.queue-indicator-infinite {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.queue-indicator-infinite:hover {
+  /* No hover effect when disabled */
+  background: var(--theme-button-bg, rgba(255, 255, 255, 0.1));
+  transform: none;
+}
+
+/* Finite mode - clickable state */
+.queue-indicator-finite {
+  cursor: pointer;
+}
+
+.queue-indicator-finite:hover {
+  background: var(--theme-button-hover, rgba(255, 255, 255, 0.2));
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.queue-indicator-finite:active {
+  transform: translateY(0);
+}
+
+/* Infinity symbol */
+.queue-indicator-infinity {
+  font-size: 24px;
+  line-height: 1;
+}
+
+/* Count display */
+.queue-indicator-count {
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 700;
+}

@@ -1,0 +1,50 @@
+* {
+    font-family: monospace;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    /* Tile Corner Radius - controls all tile/block corner radii */
+    --tile-border-radius: 5px;
+    /* SVG block radius in viewbox units (100x100 viewbox, so 15 = 15%) */
+    --block-svg-radius: 15;
+    
+    /* Z-Index Layer System */
+    --z-background: 0;
+    
+    /* Default animation color for light mode */
+    --theme-animation-color: rgba(100, 100, 100, 0.15);
+    --z-board: 10;
+    --z-block: 20;
+    --z-ui: 100;
+    /* Header, standard buttons */
+    --z-floating: 200;
+    /* Floating controls like music, crash button */
+    --z-drag: 500;
+    /* Dragging elements */
+    --z-overlay: 1000;
+    /* Game Over, Map */
+    --z-modal: 2000;
+    /* Modifiers, Stats */
+    --z-particles: 3000;
+    /* Gem shower */
+    --z-toast: 5000;
+    /* Toasts/Notifications */
+    --z-debug: 9000;
+    /* Debug tools */
+    --z-critical: 10000;
+    /* Error boundaries */
+}
+
+.App {
+    height: 100vh;
+    width: 100vw;
+    background: var(--theme-background, rgb(25, 25, 25));
+    color: var(--theme-text, rgb(255, 255, 255));
+    overflow: hidden;
+    position: fixed;
+    top: 0;
+    left: 0;
+}

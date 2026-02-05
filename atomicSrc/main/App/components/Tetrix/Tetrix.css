@@ -1,0 +1,27 @@
+.tetrix {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 90vh;
+  position: relative;
+  gap: 20px;
+  overflow: hidden;
+  /* Prevent any scrolling */
+  box-sizing: border-box;
+}
+
+/* Portrait screens: Grid on top, controls below */
+@media (max-aspect-ratio: 1/1) {
+  .tetrix {
+    flex-direction: column;
+    align-content: center;
+  }
+}
+
+/* Landscape screens: Grid left, controls right */
+@media (min-aspect-ratio: 1/1) {
+  .tetrix {
+    flex-direction: row;
+  }
+}

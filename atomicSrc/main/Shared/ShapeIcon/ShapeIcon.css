@@ -1,0 +1,35 @@
+.shape-icon {
+  pointer-events: none;
+  user-select: none;
+  flex-shrink: 0;
+  /* Use white icons with dark shadow for contrast against colored backgrounds */
+  color: rgba(255, 255, 255, 0.95);
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.7)) drop-shadow(0 0 1px rgba(0, 0, 0, 0.9));
+}
+
+/* Color-specific classes - overrides for special cases if needed */
+.shape-icon-grey {
+  /* Grey blocks might need darker icons */
+  color: rgba(0, 0, 0, 0.6);
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.5)) drop-shadow(0 0 1px rgba(255, 255, 255, 0.7));
+}
+
+.shape-icon-yellow {
+  /* Yellow blocks are bright, so use darker icon */
+  color: rgba(0, 0, 0, 0.7);
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.4)) drop-shadow(0 0 1px rgba(255, 255, 255, 0.6));
+}
+
+/* Use border-left color for icons in tiles/blocks */
+.shape-icon-border-left.shape-icon-red { color: var(--color-red-border-left); }
+.shape-icon-border-left.shape-icon-orange { color: var(--color-orange-border-left); }
+.shape-icon-border-left.shape-icon-yellow { color: var(--color-yellow-border-left); }
+.shape-icon-border-left.shape-icon-green { color: var(--color-green-border-left); }
+.shape-icon-border-left.shape-icon-blue { color: var(--color-blue-border-left); }
+.shape-icon-border-left.shape-icon-purple { color: var(--color-purple-border-left); }
+.shape-icon-border-left.shape-icon-grey { color: var(--color-grey-border-left); }
+
+/* Remove shadow when using border-left color for cleaner look */
+.shape-icon-border-left {
+  filter: none;
+}

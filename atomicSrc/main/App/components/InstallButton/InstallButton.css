@@ -1,0 +1,108 @@
+.install-pwa-button {
+  background: linear-gradient(135deg, #4fd1c7 0%, #2c8f87 100%);
+  color: #1a1a2e;
+  font-weight: bold;
+  border: 2px solid #4fd1c7;
+  box-shadow: 0 0 10px rgba(79, 209, 199, 0.3);
+  animation: pulse-glow 2s infinite;
+}
+
+.install-pwa-button:hover {
+  background: linear-gradient(135deg, #6ff3e8 0%, #3aa39a 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 0 15px rgba(79, 209, 199, 0.5);
+}
+
+@keyframes pulse-glow {
+  0% {
+    box-shadow: 0 0 5px rgba(79, 209, 199, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(79, 209, 199, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(79, 209, 199, 0.2);
+  }
+}
+
+/* iOS Instructions Modal */
+.ios-instructions-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  z-index: 10000;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding-bottom: 40px;
+  animation: fadeIn 0.3s ease;
+}
+
+.ios-instructions-card {
+  background: #1a1a2e;
+  border: 2px solid #4fd1c7;
+  border-radius: 16px;
+  padding: 24px;
+  width: 90%;
+  max-width: 400px;
+  color: white;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  position: relative;
+  animation: slideUp 0.3s ease;
+}
+
+.ios-instructions-card h3 {
+  margin: 0 0 16px 0;
+  color: #4fd1c7;
+  text-align: center;
+}
+
+.ios-step {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.ios-icon {
+  font-size: 24px;
+  margin-right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.ios-close-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.ios-close-button:hover {
+  color: white;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

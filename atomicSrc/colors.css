@@ -1,0 +1,43 @@
+:root {
+  --color-grey-bg: #9e9e9e;
+  --color-grey-border-top: #bcbcbc;
+  --color-grey-border-left: #adadad;
+  --color-grey-border-bottom: #808080;
+  --color-grey-border-right: #8f8f8f;
+
+  --color-red-bg: #d63031;
+  --color-red-border-top: #e54d4e;
+  --color-red-border-left: #dd3e3f;
+  --color-red-border-bottom: #b01b1c;
+  --color-red-border-right: #c42526;
+
+  --color-orange-bg: #fd7e14;
+  --color-orange-border-top: #ff993d;
+  --color-orange-border-left: #ff8c26;
+  --color-orange-border-bottom: #d16006;
+  --color-orange-border-right: #e86f0d;
+
+  --color-yellow-bg: #fab005;
+  --color-yellow-border-top: #ffc533;
+  --color-yellow-border-left: #ffbb1f;
+  --color-yellow-border-bottom: #cf8f00;
+  --color-yellow-border-right: #e6a000;
+
+  --color-green-bg: #2f9e44;
+  --color-green-border-top: #4cc061;
+  --color-green-border-left: #3eb053;
+  --color-green-border-bottom: #1b7a32;
+  --color-green-border-right: #258c3b;
+
+  --color-blue-bg: #023f80;
+  --color-blue-border-top: #2b5fa3;
+  --color-blue-border-left: #184f94;
+  --color-blue-border-bottom: #002352;
+  --color-blue-border-right: #00306b;
+
+  --color-purple-bg: #7950f2;
+  --color-purple-border-top: #9673ff;
+  --color-purple-border-left: #8863ff;
+  --color-purple-border-bottom: #5832cc;
+  --color-purple-border-right: #6840e0;
+}

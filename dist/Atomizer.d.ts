@@ -7,7 +7,9 @@ export = Atomizer;
 declare class Atomizer {
     constructor(srcPath: any, options?: {});
     srcPath: string;
-    options: {};
+    options: {
+        includeTests: boolean;
+    };
     verbose: any;
     log(message: any): void;
     /**

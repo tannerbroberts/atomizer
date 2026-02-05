@@ -1,0 +1,57 @@
+/* Dragging shape styles */
+.dragging-shape-container {
+  position: fixed;
+  pointer-events: none;
+  z-index: var(--z-drag);
+  display: grid;
+  transition: none;
+  top: var(--container-top);
+  left: var(--container-left);
+  grid-template-columns: repeat(4, var(--tile-size));
+  grid-template-rows: repeat(4, var(--tile-size));
+  gap: var(--grid-gap);
+  transform: scale(var(--scale));
+}
+
+.dragging-shape-cell {
+  position: relative;
+  width: var(--tile-size);
+  height: var(--tile-size);
+}
+
+.dragging-phase .dragging-shape-cell {
+  transition: width 200ms, height 200ms, transform 200ms;
+}
+
+.wiggle-wrapper {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  transition: width var(--invalid-anim-duration, 200ms) ease, height var(--invalid-anim-duration, 200ms) ease, margin var(--invalid-anim-duration, 200ms) ease;
+}
+
+@keyframes wiggle {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  25% {
+    transform: rotate(5deg);
+  }
+
+  75% {
+    transform: rotate(-5deg);
+  }
+
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.invalid-cell .wiggle-wrapper {
+  width: 50%;
+  height: 50%;
+  margin: 25%;
+  animation: wiggle var(--invalid-anim-duration, 0.2s) linear infinite;
+  animation-delay: var(--wiggle-delay);
+}

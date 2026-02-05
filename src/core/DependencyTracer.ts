@@ -1,5 +1,5 @@
 import { Node, SourceFile, SyntaxKind } from 'ts-morph';
-import { ProjectIndex, DeclarationInfo } from './ProjectIndex';
+import { ProjectIndex, DeclarationInfo, ExportInfo } from './ProjectIndex';
 
 export interface DependencyInfo {
   declaration: DeclarationInfo;
@@ -177,7 +177,7 @@ export class DependencyTracer {
           if (!symbol) continue;
 
           const declarations = symbol.getDeclarations();
-          const isReferenceToOurDeclaration = declarations.some(d => d === node);
+          const isReferenceToOurDeclaration = declarations.some((d: Node) => d === node);
 
           if (!isReferenceToOurDeclaration) continue;
 
@@ -223,9 +223,9 @@ export class DependencyTracer {
     const filePath = declInfo.filePath;
 
     for (const exportInfo of exports) {
-      if (exportInfo.filePath !== filePath) continue;
+      if ((exportInfo as any).filePath !== filePath) continue;
 
-      for (const { local, exported } of exportInfo.exportedNames) {
+      for (const { local, exported } of (exportInfo as ExportInfo).exportedNames) {
         if (exported === 'default' && (local === declInfo.name || local.startsWith('DEFAULT_'))) {
           return true;
         }

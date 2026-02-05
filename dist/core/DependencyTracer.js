@@ -150,7 +150,7 @@ class DependencyTracer {
                     if (!symbol)
                         continue;
                     const declarations = symbol.getDeclarations();
-                    const isReferenceToOurDeclaration = declarations.some(d => d === node);
+                    const isReferenceToOurDeclaration = declarations.some((d) => d === node);
                     if (!isReferenceToOurDeclaration)
                         continue;
                     if (identifier === node)

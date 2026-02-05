@@ -1,0 +1,86 @@
+.number-input-submenu {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 180px;
+}
+
+.number-input-label {
+  font-size: 11px;
+  font-weight: bold;
+  color: #aaaaaa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.number-input-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.number-input-button {
+  width: 32px;
+  height: 32px;
+  background-color: rgba(68, 68, 68, 0.8);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.number-input-button:hover:not(:disabled) {
+  background-color: rgba(100, 100, 100, 0.9);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.number-input-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.number-input-field {
+  flex: 1;
+  height: 32px;
+  background-color: rgba(30, 30, 30, 0.9);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 16px;
+  text-align: center;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.number-input-field:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.6);
+  background-color: rgba(40, 40, 40, 0.9);
+}
+
+/* Remove spinner arrows */
+.number-input-field::-webkit-inner-spin-button,
+.number-input-field::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.number-input-field {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.number-input-hint {
+  font-size: 10px;
+  color: #888888;
+  text-align: center;
+  line-height: 1.3;
+}

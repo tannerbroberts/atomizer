@@ -33,7 +33,13 @@ class FileInventory {
 
 
     if (!this.includeTests) {
-      ignorePatterns.push('**/*.test.*', '**/*.spec.*', '**/__tests__/**');
+      ignorePatterns.push(
+        '**/*.test.*',
+        '**/*.spec.*',
+        '**/__tests__/**',
+        '**/test/**',
+        '**/tests/**'
+      );
     }
 
 

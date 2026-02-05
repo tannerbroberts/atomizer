@@ -1,0 +1,149 @@
+/* Overlay Backdrop - Covers the entire viewport */
+.overlay-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  background-color: var(--theme-overlay-bg, rgba(0, 0, 0, 0.85));
+  z-index: var(--z-overlay);
+  display: flex;
+  animation: overlay-fade-in 0.3s ease-out;
+  
+  /* Ensure no overflow */
+  overflow: hidden;
+}
+
+.overlay-backdrop.overlay-centered {
+  align-items: center;
+  justify-content: center;
+}
+
+.overlay-backdrop.overlay-blur {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* Overlay Content - Constrained and scrollable container */
+.overlay-content {
+  display: flex;
+  flex-direction: column;
+  
+  /* Constrain to viewport with safe margins */
+  max-width: calc(100vw - 32px);
+  max-width: calc(100dvw - 32px);
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  
+  /* Allow content to be smaller than max */
+  width: fit-content;
+  height: fit-content;
+  
+  /* Enable internal scrolling when content overflows */
+  overflow-y: auto;
+  overflow-x: hidden;
+  
+  /* Account for safe areas on mobile devices */
+  padding-top: env(safe-area-inset-top, 0);
+  padding-right: env(safe-area-inset-right, 0);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding-left: env(safe-area-inset-left, 0);
+  
+  animation: overlay-slide-up 0.3s ease-out;
+  
+  /* Smooth scrolling */
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  
+  /* Custom scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.overlay-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.overlay-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overlay-content::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.overlay-content::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Inner scrollable area for children to use */
+.overlay-scroll-area {
+  flex: 1;
+  min-height: 0; /* Critical for flex shrinking */
+  overflow-y: auto;
+  overflow-x: hidden;
+  
+  /* Smooth scrolling */
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  
+  /* Custom scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.overlay-scroll-area::-webkit-scrollbar {
+  width: 6px;
+}
+
+.overlay-scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overlay-scroll-area::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.overlay-scroll-area::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Animations */
+@keyframes overlay-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes overlay-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive adjustments for very small screens */
+@media (max-height: 500px) {
+  .overlay-content {
+    max-height: calc(100dvh - 16px);
+  }
+}
+
+@media (max-width: 400px) {
+  .overlay-content {
+    max-width: calc(100dvw - 16px);
+  }
+}

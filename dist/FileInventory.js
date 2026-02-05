@@ -29,7 +29,7 @@ class FileInventory {
             '**/build/**',
         ];
         if (!this.includeTests) {
-            ignorePatterns.push('**/*.test.*', '**/*.spec.*', '**/__tests__/**');
+            ignorePatterns.push('**/*.test.*', '**/*.spec.*', '**/__tests__/**', '**/test/**', '**/tests/**');
         }
         ignorePatterns.push('**/__mocks__/**');
         const files = [];

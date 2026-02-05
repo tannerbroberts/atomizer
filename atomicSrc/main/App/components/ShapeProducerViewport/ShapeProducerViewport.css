@@ -1,0 +1,27 @@
+.shape-producer-viewport {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  gap: 0;
+
+  /* Critical: Enforce strict sizing based on 4 items */
+  /* The variable --game-controls-button-size must be provided by parent context */
+
+  /* Ensure this container is rigid and doesn't participate in parent flex resizing */
+  flex: 0 0 auto;
+  box-sizing: content-box; /* Explicitly use content-box so width = content */
+}
+
+.shape-producer-viewport.landscape {
+  flex-direction: column;
+  width: var(--game-controls-button-size);
+  height: calc(4 * var(--game-controls-button-size));
+}
+
+.shape-producer-viewport.portrait {
+  flex-direction: row;
+  width: calc(4 * var(--game-controls-button-size));
+  height: var(--game-controls-button-size);
+}

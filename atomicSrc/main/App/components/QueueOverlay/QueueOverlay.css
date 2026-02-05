@@ -1,0 +1,141 @@
+/* QueueOverlay uses Overlay component - these styles extend it */
+
+.queue-overlay-content {
+  position: relative;
+  width: 90vw;
+  max-width: 600px;
+  background: var(--theme-overlay-bg, rgba(0, 0, 0, 0.85));
+  border: 2px solid var(--theme-shape-selector-border, rgba(255, 255, 255, 0.3));
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  padding: 24px;
+  color: var(--theme-text, white);
+}
+
+.queue-overlay-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--theme-shape-selector-border, rgba(255, 255, 255, 0.2));
+}
+
+.queue-overlay-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--theme-text, white);
+}
+
+.queue-overlay-close {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: var(--theme-text-secondary, #aaa);
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.queue-overlay-close:hover {
+  background-color: var(--theme-button-hover, rgba(255, 255, 255, 0.1));
+  color: var(--theme-text, white);
+}
+
+.queue-overlay-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.queue-overlay-empty {
+  text-align: center;
+  color: var(--theme-text-secondary, #aaa);
+  font-size: 16px;
+  padding: 40px 20px;
+}
+
+.queue-overlay-shapes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 120px));
+  gap: 12px;
+  padding: 8px;
+  justify-content: center;
+}
+
+.queue-overlay-shape {
+  background: var(--theme-button-bg, rgba(255, 255, 255, 0.05));
+  border: 2px solid var(--theme-shape-selector-border, rgba(255, 255, 255, 0.2));
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  /* Ensure shape display can fill the space */
+  min-height: 0;
+  max-width: 120px;
+}
+
+.queue-overlay-shape-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--theme-text-secondary, #aaa);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* ShapeDisplay wrapper - ensures square aspect ratio and fills available space */
+.queue-overlay-shape > .shape-display {
+  width: 100%;
+  aspect-ratio: 1;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .queue-overlay-content {
+    width: 95vw;
+    padding: 20px 16px;
+    max-height: 90vh;
+  }
+
+  .queue-overlay-header h2 {
+    font-size: 20px;
+  }
+
+  .queue-overlay-shapes {
+    grid-template-columns: repeat(auto-fit, minmax(70px, 100px));
+    gap: 10px;
+  }
+
+  .queue-overlay-shape {
+    max-width: 100px;
+    padding: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .queue-overlay-shapes {
+    grid-template-columns: repeat(auto-fit, minmax(60px, 90px));
+    gap: 8px;
+  }
+
+  .queue-overlay-shape {
+    max-width: 90px;
+    padding: 6px;
+    gap: 4px;
+  }
+
+  .queue-overlay-shape-label {
+    font-size: 12px;
+  }
+}

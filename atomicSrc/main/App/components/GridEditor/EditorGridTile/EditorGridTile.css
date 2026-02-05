@@ -1,0 +1,47 @@
+/* EditorGridTile specific styles */
+
+/* Grid editor mode - translucent color overlay for painted tiles */
+.editor-grid-tile-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  border-radius: 5px;
+  opacity: 0.3;
+  transition: opacity 0.2s ease;
+}
+
+.editor-grid-tile:hover .editor-grid-tile-overlay {
+  opacity: 0.5;
+}
+
+/* Color-specific overlays - highly saturated but translucent */
+.editor-grid-tile-overlay.color-grey {
+  background-color: #9e9e9e;
+}
+
+.editor-grid-tile-overlay.color-red {
+  background-color: #f44336;
+}
+
+.editor-grid-tile-overlay.color-orange {
+  background-color: #ff9800;
+}
+
+.editor-grid-tile-overlay.color-yellow {
+  background-color: #ffeb3b;
+}
+
+.editor-grid-tile-overlay.color-green {
+  background-color: #4caf50;
+}
+
+.editor-grid-tile-overlay.color-blue {
+  background-color: #2196f3;
+}
+
+.editor-grid-tile-overlay.color-purple {
+  background-color: #9c27b0;
+}

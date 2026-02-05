@@ -1,0 +1,51 @@
+.shape-selector {
+  /* Force full width/height to push indicator to next line in parent */
+  flex-basis: 100%;
+  /* Center the viewport within this wrapper */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.shape-selector-shape-wrapper {
+  width: var(--game-controls-button-size);
+  height: var(--game-controls-button-size);
+  /* Transition for smooth shrinking when shape is removed */
+  transition: width 0.3s cubic-bezier(0.25, 1, 0.5, 1),
+    height 0.3s cubic-bezier(0.25, 1, 0.5, 1),
+    opacity 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  flex-shrink: 0;
+  /* Prevent wrapper from shrinking on its own */
+}
+
+/* No margins - shapes are directly adjacent */
+.shape-selector-shape-wrapper[data-landscape="0"],
+.shape-selector-shape-wrapper[data-landscape="1"] {
+  margin: 0;
+}
+
+/* Animation state for removing shapes */
+.shape-selector-shape-wrapper.removing {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* Empty queue placeholder styling */
+.shape-selector-empty-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+}
+
+.empty-queue-message {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  user-select: none;
+}
